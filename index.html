@@ -187,10 +187,14 @@ import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10
     if (!isBpkp(u)) { setErr(`Akun ${u.email || ""} bukan akun BPKP. Gunakan akun @bpkp.go.id.`); await signOut(auth); return; }
     busy(true, "Memuat data…");
     try {
-      const snap = await getDoc(doc(db, "lokus_tw4", "data"));
+      const ak = await getDoc(doc(db, "akses", u.email.toLowerCase()));
+      if (!ak.exists()) { setErr(`Akun ${u.email} belum terdaftar untuk aplikasi ini. Akses diberikan kepada pegawai D302 dan pegawai Perwakilan BPKP sesuai daftar pegawai; hubungi Tim APP KDKMP (D302) bila perlu akses.`); await signOut(auth); return; }
+      const A = ak.data();
+      const snap = await getDoc(doc(db, "lokus_tw4", A.role === "D302" ? "data" : "pw_" + A.pw));
       if (!snap.exists()) throw new Error("Data belum tersedia.");
       DATA = JSON.parse(snap.data().json);
-      $("#who").textContent = u.email;
+      DATA.unit = A.role === "D302" ? "D302 · semua Perwakilan" : A.unit;
+      $("#who").textContent = `${u.email} · ${DATA.unit}`;
       start();
     } catch (e) {
       setErr(e && e.code === "permission-denied" ? "Akses ditolak. Pastikan memakai akun @bpkp.go.id." : "Gagal memuat data: " + (e.message || e));
@@ -213,7 +217,7 @@ import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10
   function start() {
     $("#login").classList.add("hidden"); $("#app").classList.remove("hidden");
     const L = DATA.lokasi, R = DATA.ringkasan;
-    $("#meta").textContent = `Lokus per Perwakilan BPKP · maksimal 10 lokasi per Perwakilan · data portal ${DATA.generated}`;
+    $("#meta").textContent = `${DATA.pw_nama ? DATA.pw_nama + " · " : "Lokus per Perwakilan BPKP · "}maksimal 10 lokasi per Perwakilan · data portal ${DATA.generated}`;
     $("#foot").textContent = `Sumber: ${DATA.sumber}. Disusun untuk pengawasan pembangunan gedung KDKMP Triwulan IV 2026.`;
     const c = (p) => L.filter((x) => x.kat.startsWith(p)).length;
     const k = [[R.length, "Perwakilan /\nkab/kota lokus", "var(--navy)"], [L.length, "lokasi uji petik\nKDKMP", "var(--navy)"],
