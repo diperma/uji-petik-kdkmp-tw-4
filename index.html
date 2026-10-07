@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Lokus Uji Petik KDKMP TW IV 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0B2D72; --blue:#2866AB; --red:#990000; --black:#111111;
+  --bg:#F4F6F9; --card:#FFFFFF; --ink:#1F2937; --ink2:#404040; --mute:#5B6472; --line:#DDE2EA; --alt:#EEF2F8;
+  --k4:#2866AB; --k2:#990000; --k1:#1F2937; --k3:#5B6472;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Poppins,Arial,sans-serif;font-size:14px}
+button,input,select{font:inherit}
+.stripe{height:6px;background:linear-gradient(90deg,var(--blue) 0 22%,var(--red) 22% 48%,var(--black) 48% 100%)}
+.hidden{display:none!important}
+
+/* login */
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.login-card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(11,45,114,.08)}
+.login-body{padding:28px 28px 24px}
+.brand{font-size:12px;color:var(--mute);letter-spacing:.02em}
+.login-title{margin:6px 0 2px;font-size:22px;font-weight:700;color:var(--ink2);line-height:1.25}
+.login-title b{color:var(--blue)}
+.login-sub{margin:0 0 20px;color:var(--mute);font-size:13px}
+label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:12px 0 6px}
+input[type=text],input[type=password],input[type=search],select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+input:focus,select:focus{outline:2px solid var(--blue);outline-offset:0;border-color:var(--blue)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:6px;border:1px solid transparent;cursor:pointer;font-weight:600}
+.btn-primary{background:var(--navy);color:#fff;width:100%;margin-top:20px}
+.btn-primary:disabled{opacity:.6;cursor:progress}
+.btn-ghost{background:#fff;border-color:var(--line);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--blue);color:var(--blue)}
+.err{color:var(--red);font-size:13px;margin-top:12px;min-height:18px}
+
+/* app */
+header.top{background:var(--card);border-bottom:1px solid var(--line)}
+.top-inner{max-width:1360px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.top h1{margin:0;font-size:22px;font-weight:700;color:var(--ink2);line-height:1.2}
+.top h1 b{color:var(--blue)}
+.top .meta{color:var(--mute);font-size:12px}
+.top .spacer{flex:1}
+main{max-width:1360px;margin:0 auto;padding:16px}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--navy);border-radius:6px;padding:10px 12px;display:flex;align-items:center;gap:10px}
+.kpi .n{font-size:26px;font-weight:700;line-height:1}
+.kpi .l{font-size:12px;color:var(--ink);line-height:1.3}
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:12px}
+.tab{background:none;border:none;padding:10px 14px;cursor:pointer;font-weight:600;color:var(--mute);border-bottom:3px solid transparent;margin-bottom:-2px}
+.tab[aria-selected=true]{color:var(--navy);border-bottom-color:var(--navy)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:10px}
+.toolbar .f{min-width:200px;flex:1}
+.toolbar .f label{margin-top:0}
+.count{color:var(--mute);font-size:13px;margin:4px 0 8px}
+.tablewrap{background:var(--card);border:1px solid var(--line);border-radius:6px;overflow:auto;max-height:70vh}
+table{border-collapse:collapse;width:100%;font-size:13px}
+thead th{position:sticky;top:0;background:var(--navy);color:#fff;text-align:left;font-weight:600;padding:9px 10px;white-space:nowrap;z-index:1}
+tbody td{padding:7px 10px;border-top:1px solid var(--line);vertical-align:top}
+tbody tr:nth-child(even) td{background:var(--alt)}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:#DCE7F5}
+td.num,th.num{text-align:center;white-space:nowrap}
+td.no{background:var(--blue)!important;color:#fff;font-weight:600;text-align:center}
+.z{color:#A0A7B4}
+.b4{color:var(--k4);font-weight:700}.b2{color:var(--k2);font-weight:700}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap;border:1px solid}
+.bg4p{color:#fff;background:var(--blue);border-color:var(--blue)}
+.bg4o{color:var(--blue);background:#E3ECF7;border-color:#B9CDE6}
+.bg2{color:#fff;background:var(--red);border-color:var(--red)}
+.bg1{color:var(--ink);background:#E5E7EB;border-color:#D1D5DB}
+.bg3{color:var(--mute);background:#fff;border-color:var(--line)}
+.dot{font-weight:700}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink);margin:10px 2px}
+.note{font-size:12px;color:var(--mute);margin-top:10px;line-height:1.5}
+a{color:var(--blue)}
+footer{max-width:1360px;margin:0 auto;padding:8px 16px 24px;color:var(--mute);font-size:12px}
+@media (max-width:1000px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.top h1{font-size:18px}.kpi .n{font-size:22px}}
+</style>
+</head>
+<body>
+
+<section id="login" aria-label="Masuk">
+  <div class="login-card">
+    <div class="stripe"></div>
+    <div class="login-body">
+      <div class="brand">Badan Pengawasan Keuangan dan Pembangunan</div>
+      <h1 class="login-title">Lokus Uji Petik <b>KDKMP TW IV 2026</b></h1>
+      <p class="login-sub">Masuk dengan akun Google BPKP (@bpkp.go.id) untuk melihat daftar lokus dan lokasi uji petik per Perwakilan.</p>
+      <button class="btn btn-primary" id="loginBtn" type="button">
+        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 38.2 44 33 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+        <span id="loginLabel">Masuk dengan Akun BPKP</span>
+      </button>
+      <div class="err" id="err" role="alert"></div>
+      <p class="login-sub" style="margin:8px 0 0;font-size:12px">Hanya akun @bpkp.go.id yang dapat mengakses data.</p>
+    </div>
+  </div>
+</section>
+
+<div id="app" class="hidden">
+  <header class="top">
+    <div class="top-inner">
+      <div>
+        <h1>Lokus Uji Petik <b>KDKMP TW IV 2026</b></h1>
+        <div class="meta" id="meta"></div>
+      </div>
+      <div class="spacer"></div>
+      <span class="meta" id="who"></span>
+      <button class="btn btn-ghost" id="logout" type="button">Keluar</button>
+    </div>
+    <div class="stripe"></div>
+  </header>
+  <main>
+    <div class="kpis" id="kpis"></div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="t-ring" aria-selected="true" aria-controls="v-ring">Ringkasan per Perwakilan</button>
+      <button class="tab" role="tab" id="t-daftar" aria-selected="false" aria-controls="v-daftar">Daftar Lokasi Uji Petik</button>
+    </div>
+
+    <section id="v-ring" role="tabpanel" aria-labelledby="t-ring">
+      <div class="legend">
+        <span><span class="dot" style="color:var(--blue)">●</span> Memiliki semua kategori (1)–(4)</span>
+        <span><span class="dot" style="color:var(--ink)">●</span> Memiliki semua kategori (1)–(3), wilayah belum ada KDKMP beroperasi</span>
+        <span><span class="dot" style="color:var(--red)">●</span> Kategori terbanyak di wilayah kerja</span>
+      </div>
+      <div class="tablewrap"><table id="tblRing"></table></div>
+      <p class="note">Klik baris untuk membuka daftar lokasi Perwakilan tersebut. Kolom: (4) Ops = sudah beroperasi, (2) Mandek = belum terbangun mandek &gt; 3 bulan, (1) Bangun = terbangun dengan kelengkapan, (3) Lahan = belum memiliki lahan.
+      Maksimal 10 lokasi per Perwakilan; KDKMP belum memiliki lahan maksimal 3. Wilayah tanpa KDKMP beroperasi: 4 mandek, 3 terbangun dengan kelengkapan, 3 belum memiliki lahan. Wilayah dengan KDKMP beroperasi: beroperasi didahulukan (seluruh 84 titik prioritas yang belum pernah diuji petik BPKP, minimal 3), lalu 3 mandek, 2 terbangun, 2 belum lahan; Jawa Tengah, DIY, dan Jawa Timur tetap 10 KDKMP beroperasi. Bila kategori di kab/kota lokus kurang, diisi mandek dari kab/kota lain di wilayah kerja yang sama. KDKMP sampel TW II/TW III tidak diambil ulang. Wilayah kerja sesuai Peraturan BPKP Nomor 5 Tahun 2026.</p>
+    </section>
+
+    <section id="v-daftar" role="tabpanel" aria-labelledby="t-daftar" class="hidden">
+      <div class="toolbar">
+        <div class="f"><label for="fPw">Perwakilan</label><select id="fPw"></select></div>
+        <div class="f"><label for="fKat">Kategori</label><select id="fKat"></select></div>
+        <div class="f"><label for="fQ">Cari (desa, kecamatan, kode, nama)</label><input id="fQ" type="search" placeholder="mis. Bintaro"></div>
+        <button class="btn btn-ghost" id="csv" type="button">Unduh CSV</button>
+      </div>
+      <div class="count" id="count"></div>
+      <div class="tablewrap"><table id="tblDaftar"></table></div>
+    </section>
+  </main>
+  <footer id="foot"></footer>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const fmt = (n) => Number(n || 0).toLocaleString("id-ID");
+  let DATA = null;
+  const fb = initializeApp({
+    apiKey: "AIzaSyD4Ayisb3Gsb0VYfr_H4RtpLQH7du9h2DY",
+    authDomain: "uji-petik-kdkmp-tw-4-2026.firebaseapp.com",
+    projectId: "uji-petik-kdkmp-tw-4-2026",
+    appId: "1:679154129581:web:8ff500bf11eb77f4358424",
+  });
+  const auth = getAuth(fb), db = getFirestore(fb);
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ hd: "bpkp.go.id", prompt: "select_account" });
+  const isBpkp = (u) => !!u && u.emailVerified && /^[^@]+@bpkp\.go\.id$/i.test(u.email || "");
+  const setErr = (m) => { $("#err").textContent = m || ""; };
+  const busy = (on, label) => { $("#loginBtn").disabled = on; $("#loginLabel").textContent = label || "Masuk dengan Akun BPKP"; };
+
+  $("#loginBtn").addEventListener("click", async () => {
+    setErr(""); busy(true, "Membuka login Google…");
+    try { await signInWithPopup(auth, provider); }
+    catch (e) {
+      if (e && (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment")) { await signInWithRedirect(auth, provider); return; }
+      if (e && e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") setErr("Login gagal: " + (e.code || e.message));
+      busy(false);
+    }
+  });
+  $("#logout").addEventListener("click", () => signOut(auth));
+
+  onAuthStateChanged(auth, async (u) => {
+    if (!u) { DATA = null; $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); busy(false); return; }
+    if (!isBpkp(u)) { setErr(`Akun ${u.email || ""} bukan akun BPKP. Gunakan akun @bpkp.go.id.`); await signOut(auth); return; }
+    busy(true, "Memuat data…");
+    try {
+      const snap = await getDoc(doc(db, "lokus_tw4", "data"));
+      if (!snap.exists()) throw new Error("Data belum tersedia.");
+      DATA = JSON.parse(snap.data().json);
+      $("#who").textContent = u.email;
+      start();
+    } catch (e) {
+      setErr(e && e.code === "permission-denied" ? "Akses ditolak. Pastikan memakai akun @bpkp.go.id." : "Gagal memuat data: " + (e.message || e));
+      await signOut(auth);
+    } finally { busy(false); }
+  });
+
+  const KATS = [
+    ["(4) Beroperasi — prioritas uji petik", "bg4p", "Beroperasi · prioritas"],
+    ["(4) Beroperasi — potensial uji petik", "bg4o", "Beroperasi · potensial"],
+    ["(2) Mandek > 3 bulan", "bg2", "Mandek > 3 bulan"],
+    ["(1) Terbangun dengan kelengkapan", "bg1", "Terbangun dgn kelengkapan"],
+    ["(3) Belum memiliki lahan", "bg3", "Belum memiliki lahan"],
+  ];
+  const katInfo = (k) => KATS.find((x) => x[0] === k) || [k, "bg3", k];
+  const tierColor = (d) => d.startsWith("Memiliki semua kategori (1)–(4)") ? "var(--blue)" : d.startsWith("Memiliki semua") ? "var(--ink)" : "var(--red)";
+  const short = (pw) => pw.replace("Perwakilan BPKP ", "").replace("Daerah Khusus Ibu Kota Jakarta", "DKI Jakarta").replace("Daerah Istimewa Yogyakarta", "DI Yogyakarta");
+  const title = (s) => String(s || "").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bAdm\b/, "Adm").replace(/ Dan /g, " dan ");
+
+  function start() {
+    $("#login").classList.add("hidden"); $("#app").classList.remove("hidden");
+    const L = DATA.lokasi, R = DATA.ringkasan;
+    $("#meta").textContent = `Lokus per Perwakilan BPKP · maksimal 10 lokasi per Perwakilan · data portal ${DATA.generated}`;
+    $("#foot").textContent = `Sumber: ${DATA.sumber}. Disusun untuk pengawasan pembangunan gedung KDKMP Triwulan IV 2026.`;
+    const c = (p) => L.filter((x) => x.kat.startsWith(p)).length;
+    const k = [[R.length, "Perwakilan /\nkab/kota lokus", "var(--navy)"], [L.length, "lokasi uji petik\nKDKMP", "var(--navy)"],
+      [c("(4)"), "(4) sudah\nberoperasi", "var(--blue)"], [c("(2)"), "(2) mandek\n> 3 bulan", "var(--red)"],
+      [c("(1)"), "(1) terbangun dgn\nkelengkapan", "var(--ink)"], [c("(3)"), "(3) belum\nmemiliki lahan", "var(--ink)"]];
+    $("#kpis").innerHTML = k.map(([n, l, col]) => `<div class="kpi" style="border-left-color:${col}"><div class="n" style="color:${col}">${fmt(n)}</div><div class="l">${esc(l).replace("\n", "<br>")}</div></div>`).join("");
+
+    const cell = (v, cls) => v ? `<td class="num ${cls || ""}">${fmt(v)}</td>` : `<td class="num z">–</td>`;
+    $("#tblRing").innerHTML = `<thead><tr><th class="num">No</th><th>Perwakilan</th><th>Lokasi kantor</th><th>Kab/Kota lokus</th><th>Dasar pemilihan</th><th class="num">(4) Ops</th><th class="num">(2) Mandek</th><th class="num">(1) Bangun</th><th class="num">(3) Lahan</th><th class="num">Jml</th></tr></thead><tbody>` +
+      R.map((r) => `<tr class="click" data-pw="${esc(r.pw)}"><td class="no">${r.no}</td><td>${esc(short(r.pw))}</td><td>${esc(r.kantor)}</td><td><span class="dot" style="color:${tierColor(r.dasar)}">●</span> ${esc(title(r.kab))}</td><td style="max-width:360px">${esc(r.dasar)}</td>${cell(r.l4, "b4")}${cell(r.l2, "b2")}${cell(r.l1)}${cell(r.l3)}<td class="num"><b>${fmt(r.tot)}</b></td></tr>`).join("") + `</tbody>`;
+    $("#tblRing").querySelectorAll("tr.click").forEach((tr) => tr.addEventListener("click", () => { $("#fPw").value = tr.dataset.pw; show("daftar"); render(); }));
+
+    $("#fPw").innerHTML = `<option value="">Semua Perwakilan (${R.length})</option>` + R.map((r) => `<option value="${esc(r.pw)}">${r.no}. ${esc(short(r.pw))} — ${esc(title(r.kab))}</option>`).join("");
+    $("#fKat").innerHTML = `<option value="">Semua kategori</option>` + KATS.map(([v, , l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
+    ["#fPw", "#fKat"].forEach((s) => $(s).addEventListener("change", render));
+    $("#fQ").addEventListener("input", render);
+    render();
+  }
+
+  function filtered() {
+    const pw = $("#fPw").value, kat = $("#fKat").value, q = $("#fQ").value.trim().toLowerCase();
+    return DATA.lokasi.filter((x) => (!pw || x.pw === pw) && (!kat || x.kat === kat) &&
+      (!q || [x.desa, x.kec, x.kode, x.nama, x.kab, x.nik].some((v) => String(v || "").toLowerCase().includes(q))));
+  }
+  function render() {
+    const rows = filtered();
+    $("#count").textContent = `${fmt(rows.length)} lokasi ditampilkan dari ${fmt(DATA.lokasi.length)}`;
+    $("#tblDaftar").innerHTML = `<thead><tr><th class="num">No</th><th>Perwakilan</th><th>Kab/Kota</th><th class="num">Urut</th><th>Kategori</th><th>Kecamatan</th><th>Desa/Kelurahan</th><th>Kode Desa</th><th>NIK Koperasi</th><th>Nama Koperasi</th><th>Alasan pemilihan</th><th>Peta</th></tr></thead><tbody>` +
+      rows.map((x) => { const [, cls, lab] = katInfo(x.kat);
+        const map = (x.lat && x.lon) ? `<a href="https://www.google.com/maps?q=${encodeURIComponent(x.lat + "," + x.lon)}" target="_blank" rel="noopener">Buka</a>` : `<span class="z">–</span>`;
+        return `<tr><td class="num">${x.no}</td><td>${esc(short(x.pw))}</td><td>${esc(title(x.kab))}</td><td class="num">${x.urut}</td><td><span class="badge ${cls}">${esc(lab)}</span></td><td>${esc(x.kec)}</td><td>${esc(x.desa)}</td><td style="white-space:nowrap">${esc(x.kode)}</td><td>${esc(x.nik)}</td><td style="min-width:220px">${esc(x.nama)}</td><td style="min-width:260px">${esc(x.alasan)}</td><td>${map}</td></tr>`; }).join("") + `</tbody>`;
+  }
+  function show(which) {
+    const r = which === "ring";
+    $("#t-ring").setAttribute("aria-selected", r); $("#t-daftar").setAttribute("aria-selected", !r);
+    $("#v-ring").classList.toggle("hidden", !r); $("#v-daftar").classList.toggle("hidden", r);
+  }
+  $("#t-ring").addEventListener("click", () => show("ring"));
+  $("#t-daftar").addEventListener("click", () => show("daftar"));
+
+  $("#csv").addEventListener("click", () => {
+    const cols = ["no", "pw", "prov", "kab", "urut", "kat", "kec", "desa", "kode", "nik", "nama", "alasan", "lat", "lon"];
+    const head = ["No", "Perwakilan", "Provinsi", "Kabupaten/Kota", "Urut", "Kategori", "Kecamatan", "Desa/Kelurahan", "Kode Desa", "NIK Koperasi", "Nama Koperasi", "Alasan pemilihan", "Latitude", "Longitude"];
+    const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const csv = "﻿" + [head.map(q).join(";")].concat(filtered().map((x) => cols.map((c) => q(x[c])).join(";"))).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = "lokus_uji_petik_kdkmp_tw4_2026.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+})();
+</script>
+</body>
+</html>
