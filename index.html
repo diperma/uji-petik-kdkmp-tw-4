@@ -15,10 +15,11 @@
   --navy:#0B2D72; --blue:#2866AB; --red:#990000; --black:#111111;
   --bg:#F4F6F9; --card:#FFFFFF; --ink:#1F2937; --ink2:#404040; --mute:#5B6472; --line:#DDE2EA; --alt:#EEF2F8;
   --k4:#2866AB; --k2:#990000; --k1:#1F2937; --k3:#5B6472;
+  --ok:#1E6B3A; --okbg:#E3F1E8; --wait:#8A5A00; --waitbg:#FFF4D6;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Poppins,Arial,sans-serif;font-size:14px}
-button,input,select{font:inherit}
+button,input,select,textarea{font:inherit}
 .stripe{height:6px;background:linear-gradient(90deg,var(--blue) 0 22%,var(--red) 22% 48%,var(--black) 48% 100%)}
 .hidden{display:none!important}
 
@@ -31,13 +32,24 @@ button,input,select{font:inherit}
 .login-title b{color:var(--blue)}
 .login-sub{margin:0 0 20px;color:var(--mute);font-size:13px}
 label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:12px 0 6px}
-input[type=text],input[type=password],input[type=search],select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
-input:focus,select:focus{outline:2px solid var(--blue);outline-offset:0;border-color:var(--blue)}
+input[type=text],input[type=password],input[type=search],select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+textarea{resize:vertical;min-height:70px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);outline-offset:0;border-color:var(--blue)}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:6px;border:1px solid transparent;cursor:pointer;font-weight:600}
+.btn:disabled{opacity:.5;cursor:not-allowed}
 .btn-primary{background:var(--navy);color:#fff;width:100%;margin-top:20px}
 .btn-primary:disabled{opacity:.6;cursor:progress}
+.btn-navy{background:var(--navy);color:#fff}
+.btn-ok{background:var(--ok);color:#fff}
+.btn-red{background:#fff;color:var(--red);border-color:#E3B5B5}
+.btn-red:hover:not(:disabled){background:var(--red);color:#fff}
 .btn-ghost{background:#fff;border-color:var(--line);color:var(--ink)}
-.btn-ghost:hover{border-color:var(--blue);color:var(--blue)}
+.btn-ghost:hover:not(:disabled){border-color:var(--blue);color:var(--blue)}
+.mini{padding:3px 9px;font-size:12px;border-radius:5px;font-weight:600;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--navy);white-space:nowrap}
+.mini:hover:not(:disabled){border-color:var(--blue);background:#E3ECF7}
+.mini.r{color:var(--red)}
+.mini.r:hover:not(:disabled){border-color:var(--red);background:#F7E3E3}
+.mini:disabled{opacity:.45;cursor:not-allowed}
 .err{color:var(--red);font-size:13px;margin-top:12px;min-height:18px}
 
 /* app */
@@ -52,11 +64,13 @@ main{max-width:1360px;margin:0 auto;padding:16px}
 .kpi{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--navy);border-radius:6px;padding:10px 12px;display:flex;align-items:center;gap:10px}
 .kpi .n{font-size:26px;font-weight:700;line-height:1}
 .kpi .l{font-size:12px;color:var(--ink);line-height:1.3}
-.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:12px}
-.tab{background:none;border:none;padding:10px 14px;cursor:pointer;font-weight:600;color:var(--mute);border-bottom:3px solid transparent;margin-bottom:-2px}
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:12px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:none;padding:10px 14px;cursor:pointer;font-weight:600;color:var(--mute);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
 .tab[aria-selected=true]{color:var(--navy);border-bottom-color:var(--navy)}
+.tab .cnt{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--red);color:#fff;font-size:11.5px;line-height:19px;text-align:center}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:10px}
-.toolbar .f{min-width:200px;flex:1}
+.toolbar .f{min-width:180px;flex:1}
 .toolbar .f label{margin-top:0}
 .count{color:var(--mute);font-size:13px;margin:4px 0 8px}
 .tablewrap{background:var(--card);border:1px solid var(--line);border-radius:6px;overflow:auto;max-height:70vh}
@@ -76,13 +90,51 @@ td.no{background:var(--blue)!important;color:#fff;font-weight:600;text-align:cen
 .bg2{color:#fff;background:var(--red);border-color:var(--red)}
 .bg1{color:var(--ink);background:#E5E7EB;border-color:#D1D5DB}
 .bg3{color:var(--mute);background:#fff;border-color:var(--line)}
+.st{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.st-diajukan{color:var(--wait);background:var(--waitbg)}
+.st-disetujui{color:var(--ok);background:var(--okbg)}
+.st-ditolak{color:var(--red);background:#F7E3E3}
+.st-dibatalkan{color:var(--mute);background:#ECEEF2}
+.chg{font-size:11.5px;line-height:1.35}
+.chg .st{margin-bottom:2px}
+.sub{color:var(--mute);font-size:12px;line-height:1.35}
 .dot{font-weight:700}
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink);margin:10px 2px}
 .note{font-size:12px;color:var(--mute);margin-top:10px;line-height:1.5}
 a{color:var(--blue)}
 footer{max-width:1360px;margin:0 auto;padding:8px 16px 24px;color:var(--mute);font-size:12px}
+
+/* komposisi */
+.komp{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:10px;font-size:12.5px}
+.komp b{font-size:14px}
+.komp .sep{width:1px;align-self:stretch;background:var(--line)}
+.komp .chip{padding:3px 9px;border-radius:999px;background:var(--alt);white-space:nowrap}
+.komp .chip.full{background:#F7E3E3;color:var(--red)}
+.komp .grow{flex:1}
+
+/* dialog */
+dialog{border:none;border-radius:10px;padding:0;width:min(1040px,calc(100vw - 24px));max-height:calc(100vh - 24px);box-shadow:0 20px 50px rgba(11,45,114,.25);color:var(--ink)}
+dialog::backdrop{background:rgba(17,24,39,.45)}
+.dlg{display:flex;flex-direction:column;max-height:calc(100vh - 24px)}
+.dlg-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.dlg-head h2{margin:0;font-size:17px;color:var(--ink2);flex:1}
+.dlg-head .x{border:none;background:none;font-size:24px;line-height:1;cursor:pointer;color:var(--mute);padding:0 4px}
+.dlg-body{padding:14px 18px;overflow:auto}
+.dlg-foot{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap;padding:12px 18px;border-top:1px solid var(--line);background:#FAFBFC}
+.dlg-foot .msg{flex:1;font-size:12.5px;min-width:200px}
+.box{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:#FAFBFC;font-size:13px;line-height:1.45}
+.box.sel{border-color:var(--blue);background:#EEF4FB}
+.box .h{font-size:11.5px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.msg.bad{color:var(--red)}.msg.good{color:var(--ok)}
+#kTbl tbody tr.dis td{color:#9AA1AD;cursor:not-allowed}
+#kTbl tbody tr.on td{background:#CFE0F5!important}
+.pick{width:16px;height:16px;border:2px solid var(--line);border-radius:50%;display:inline-block;vertical-align:middle}
+tr.on .pick{border-color:var(--blue);background:radial-gradient(var(--blue) 45%,#fff 50%)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:6px;font-size:13px;z-index:50;max-width:calc(100vw - 32px);box-shadow:0 8px 20px rgba(0,0,0,.2)}
+.toast.bad{background:var(--red)}
 @media (max-width:1000px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.top h1{font-size:18px}.kpi .n{font-size:22px}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.top h1{font-size:18px}.kpi .n{font-size:22px}.two{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -93,7 +145,7 @@ footer{max-width:1360px;margin:0 auto;padding:8px 16px 24px;color:var(--mute);fo
     <div class="login-body">
       <div class="brand">Badan Pengawasan Keuangan dan Pembangunan</div>
       <h1 class="login-title">Lokus Uji Petik <b>KDKMP TW IV 2026</b></h1>
-      <p class="login-sub">Masuk dengan akun Google BPKP (@bpkp.go.id) untuk melihat daftar lokus dan lokasi uji petik per Perwakilan.</p>
+      <p class="login-sub">Masuk dengan akun Google BPKP (@bpkp.go.id) untuk melihat lokasi uji petik dan mengusulkan perubahan lokasi.</p>
       <button class="btn btn-primary" id="loginBtn" type="button">
         <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 38.2 44 33 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
         <span id="loginLabel">Masuk dengan Akun BPKP</span>
@@ -122,6 +174,7 @@ footer{max-width:1360px;margin:0 auto;padding:8px 16px 24px;color:var(--mute);fo
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" id="t-ring" aria-selected="true" aria-controls="v-ring">Ringkasan per Perwakilan</button>
       <button class="tab" role="tab" id="t-daftar" aria-selected="false" aria-controls="v-daftar">Daftar Lokasi Uji Petik</button>
+      <button class="tab" role="tab" id="t-usul" aria-selected="false" aria-controls="v-usul">Usulan Perubahan<span class="cnt hidden" id="usulCnt"></span></button>
     </div>
 
     <section id="v-ring" role="tabpanel" aria-labelledby="t-ring">
@@ -131,7 +184,7 @@ footer{max-width:1360px;margin:0 auto;padding:8px 16px 24px;color:var(--mute);fo
         <span><span class="dot" style="color:var(--red)">●</span> Kategori terbanyak di wilayah kerja</span>
       </div>
       <div class="tablewrap"><table id="tblRing"></table></div>
-      <p class="note">Klik baris untuk membuka daftar lokasi Perwakilan tersebut. Kolom: (4) Ops = sudah beroperasi, (2) Mandek = belum terbangun mandek &gt; 3 bulan, (1) Bangun = terbangun dengan kelengkapan, (3) Lahan = belum memiliki lahan.
+      <p class="note">Klik baris untuk membuka daftar lokasi Perwakilan tersebut. Angka lokasi sudah memperhitungkan usulan perubahan yang disetujui D302. Kolom: (4) Ops = sudah beroperasi, (2) Mandek = belum terbangun mandek &gt; 3 bulan, (1) Bangun = terbangun dengan kelengkapan, (3) Lahan = belum memiliki lahan.
       Maksimal 10 lokasi per Perwakilan; KDKMP belum memiliki lahan maksimal 3. Wilayah tanpa KDKMP beroperasi: 4 mandek, 3 terbangun dengan kelengkapan, 3 belum memiliki lahan. Wilayah dengan KDKMP beroperasi: beroperasi didahulukan (seluruh 84 titik prioritas yang belum pernah diuji petik BPKP, minimal 3), lalu 3 mandek, 2 terbangun, 2 belum lahan; Jawa Tengah, DIY, dan Jawa Timur tetap 10 KDKMP beroperasi. Bila kategori di kab/kota lokus kurang, diisi mandek dari kab/kota lain di wilayah kerja yang sama. KDKMP sampel TW II/TW III tidak diambil ulang. Wilayah kerja sesuai Peraturan BPKP Nomor 5 Tahun 2026.</p>
     </section>
 
@@ -142,22 +195,45 @@ footer{max-width:1360px;margin:0 auto;padding:8px 16px 24px;color:var(--mute);fo
         <div class="f"><label for="fQ">Cari (desa, kecamatan, kode, nama)</label><input id="fQ" type="search" placeholder="mis. Bintaro"></div>
         <button class="btn btn-ghost" id="csv" type="button">Unduh CSV</button>
       </div>
+      <div class="komp hidden" id="komp"></div>
       <div class="count" id="count"></div>
       <div class="tablewrap"><table id="tblDaftar"></table></div>
+      <p class="note" id="daftarNote"></p>
+    </section>
+
+    <section id="v-usul" role="tabpanel" aria-labelledby="t-usul" class="hidden">
+      <div class="toolbar">
+        <div class="f"><label for="uSt">Status</label><select id="uSt">
+          <option value="diajukan">Menunggu persetujuan</option><option value="disetujui">Disetujui</option>
+          <option value="ditolak">Ditolak</option><option value="dibatalkan">Dibatalkan</option><option value="">Semua status</option></select></div>
+        <div class="f" id="uPwWrap"><label for="uPw">Perwakilan</label><select id="uPw"></select></div>
+        <div class="f"><label for="uQ">Cari (nama koperasi, desa, pengusul)</label><input id="uQ" type="search"></div>
+      </div>
+      <div class="count" id="uCount"></div>
+      <div class="tablewrap"><table id="tblUsul"></table></div>
+      <p class="note">Alur: Perwakilan mengusulkan penggantian, penghapusan, atau penambahan lokasi dengan KDKMP dari populasi BNBA wilayah kerjanya → D302 meninjau → usulan yang disetujui langsung mengubah daftar lokasi. Batas tetap berlaku saat pengajuan dan persetujuan: maksimal 10 lokasi per Perwakilan dan maksimal 3 KDKMP belum memiliki lahan. Usulan tidak dapat dihapus; usulan yang masih menunggu dapat dibatalkan oleh Perwakilan pengusul.</p>
     </section>
   </main>
   <footer id="foot"></footer>
 </div>
 
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <div class="dlg">
+    <div class="dlg-head"><h2 id="dlgTitle"></h2><button class="x" type="button" id="dlgX" aria-label="Tutup">×</button></div>
+    <div class="dlg-body" id="dlgBody"></div>
+    <div class="dlg-foot" id="dlgFoot"></div>
+  </div>
+</dialog>
+<div class="toast hidden" id="toast" role="status"></div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signInWithCredential, onAuthStateChanged, signOut, connectAuthEmulator } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc, updateDoc, serverTimestamp, connectFirestoreEmulator } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 (() => {
   const $ = (s) => document.querySelector(s);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const fmt = (n) => Number(n || 0).toLocaleString("id-ID");
-  let DATA = null;
   const fb = initializeApp({
     apiKey: "AIzaSyD4Ayisb3Gsb0VYfr_H4RtpLQH7du9h2DY",
     authDomain: "uji-petik-kdkmp-tw-4-2026.firebaseapp.com",
@@ -165,11 +241,30 @@ import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10
     appId: "1:679154129581:web:8ff500bf11eb77f4358424",
   });
   const auth = getAuth(fb), db = getFirestore(fb);
+  // Mode uji lokal (emulator Firebase), hanya aktif di localhost dengan ?emu
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && new URLSearchParams(location.search).has("emu")) {
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    connectFirestoreEmulator(db, "127.0.0.1", 8093);
+    window.__emuLogin = (email) => signInWithCredential(auth, GoogleAuthProvider.credential(JSON.stringify({ sub: email, email, email_verified: true })));
+  }
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ hd: "bpkp.go.id", prompt: "select_account" });
   const isBpkp = (u) => !!u && u.emailVerified && /^[^@]+@bpkp\.go\.id$/i.test(u.email || "");
   const setErr = (m) => { $("#err").textContent = m || ""; };
   const busy = (on, label) => { $("#loginBtn").disabled = on; $("#loginLabel").textContent = label || "Masuk dengan Akun BPKP"; };
+
+  // Perwakilan BPKP sesuai Lampiran II Peraturan BPKP Nomor 5 Tahun 2026 (urutan = kode P01..P36)
+  const NAMES = ["Aceh", "Sumatera Utara", "Sumatera Barat", "Sumatera Selatan", "Riau", "Jambi", "Bengkulu", "Lampung", "Daerah Khusus Ibu Kota Jakarta",
+    "Jawa Barat", "Jawa Tengah", "Jawa Timur", "Daerah Istimewa Yogyakarta", "Kalimantan Barat", "Kalimantan Timur", "Kalimantan Selatan", "Kalimantan Tengah",
+    "Nusa Tenggara Timur", "Nusa Tenggara Barat", "Sulawesi Selatan", "Sulawesi Tengah", "Sulawesi Utara", "Sulawesi Tenggara", "Maluku", "Papua",
+    "Kepulauan Riau", "Kepulauan Bangka Belitung", "Banten", "Bali", "Sulawesi Barat", "Gorontalo", "Maluku Utara", "Papua Barat", "Kalimantan Utara",
+    "Papua Barat Daya", "Papua Tengah"];
+  const pwName = (code) => "Perwakilan BPKP " + NAMES[Number(code.slice(1)) - 1];
+  const pwCode = (name) => "P" + String(NAMES.indexOf(String(name).replace("Perwakilan BPKP ", "")) + 1).padStart(2, "0");
+  const MAXN = 10, MAX_LAHAN = 3;
+
+  let DATA = null, ME = null, USUL = [], EFF = null, unsub = null, started = false;
+  const KAND = {};
 
   $("#loginBtn").addEventListener("click", async () => {
     setErr(""); busy(true, "Membuka login Google…");
@@ -183,19 +278,24 @@ import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10
   $("#logout").addEventListener("click", () => signOut(auth));
 
   onAuthStateChanged(auth, async (u) => {
-    if (!u) { DATA = null; $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); busy(false); return; }
+    if (unsub) { unsub(); unsub = null; }
+    if (!u) { DATA = null; ME = null; USUL = []; $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); busy(false); return; }
     if (!isBpkp(u)) { setErr(`Akun ${u.email || ""} bukan akun BPKP. Gunakan akun @bpkp.go.id.`); await signOut(auth); return; }
     busy(true, "Memuat data…");
     try {
       const ak = await getDoc(doc(db, "akses", u.email.toLowerCase()));
       if (!ak.exists()) { setErr(`Akun ${u.email} belum terdaftar untuk aplikasi ini. Akses diberikan kepada pegawai D302 dan pegawai Perwakilan BPKP sesuai daftar pegawai; hubungi Tim APP KDKMP (D302) bila perlu akses.`); await signOut(auth); return; }
       const A = ak.data();
-      const snap = await getDoc(doc(db, "lokus_tw4", A.role === "D302" ? "data" : "pw_" + A.pw));
+      ME = { email: u.email.toLowerCase(), role: A.role, pw: A.pw, nama: A.nama || "", unit: A.unit || "" };
+      const snap = await getDoc(doc(db, "lokus_tw4", ME.role === "D302" ? "data" : "pw_" + ME.pw));
       if (!snap.exists()) throw new Error("Data belum tersedia.");
       DATA = JSON.parse(snap.data().json);
-      DATA.unit = A.role === "D302" ? "D302 · semua Perwakilan" : A.unit;
+      DATA.unit = ME.role === "D302" ? "D302 · semua Perwakilan" : ME.unit;
       $("#who").textContent = `${u.email} · ${DATA.unit}`;
-      start();
+      USUL = []; start();
+      const q = ME.role === "D302" ? collection(db, "usulan_tw4") : query(collection(db, "usulan_tw4"), where("pw", "==", ME.pw));
+      unsub = onSnapshot(q, (s) => { USUL = s.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) })); refresh(); },
+        (e) => toast("Gagal memuat usulan: " + (e.code || e.message), true));
     } catch (e) {
       setErr(e && e.code === "permission-denied" ? "Akses ditolak. Pastikan memakai akun @bpkp.go.id." : "Gagal memuat data: " + (e.message || e));
       await signOut(auth);
@@ -210,63 +310,356 @@ import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10
     ["(3) Belum memiliki lahan", "bg3", "Belum memiliki lahan"],
   ];
   const katInfo = (k) => KATS.find((x) => x[0] === k) || [k, "bg3", k];
+  const badge = (k) => { const [, cls, lab] = katInfo(k); return `<span class="badge ${cls}">${esc(lab)}</span>`; };
   const tierColor = (d) => d.startsWith("Memiliki semua kategori (1)–(4)") ? "var(--blue)" : d.startsWith("Memiliki semua") ? "var(--ink)" : "var(--red)";
   const short = (pw) => pw.replace("Perwakilan BPKP ", "").replace("Daerah Khusus Ibu Kota Jakarta", "DKI Jakarta").replace("Daerah Istimewa Yogyakarta", "DI Yogyakarta");
   const title = (s) => String(s || "").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bAdm\b/, "Adm").replace(/ Dan /g, " dan ");
+  const ms = (v) => (v && v.toMillis ? v.toMillis() : 0);
+  const tgl = (v) => (v && v.toDate ? v.toDate().toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "–");
+  const JENIS = { tambah: "Tambah", hapus: "Hapus", ganti: "Ganti" };
+  const STATUS = { diajukan: "Menunggu persetujuan", disetujui: "Disetujui", ditolak: "Ditolak", dibatalkan: "Dibatalkan" };
+  const canPropose = (code) => !!ME && (ME.role === "D302" || ME.pw === code);
 
+  let toastT = 0;
+  function toast(m, bad) { const t = $("#toast"); t.textContent = m; t.classList.toggle("bad", !!bad); t.classList.remove("hidden"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.add("hidden"), bad ? 7000 : 4000); }
+
+  // ---------------- daftar efektif = daftar awal + usulan yang disetujui (urut waktu persetujuan) ----------------
+  function komposisi(list) {
+    const c = { n: list.length, k4: 0, k2: 0, k1: 0, k3: 0 };
+    for (const x of list) c["k" + x.kat[1]]++;
+    return c;
+  }
+  function batasErr(list) {
+    const c = komposisi(list);
+    if (c.n > MAXN) return `jumlah lokasi menjadi ${c.n}, melebihi batas ${MAXN} per Perwakilan`;
+    if (c.k3 > MAX_LAHAN) return `KDKMP belum memiliki lahan menjadi ${c.k3}, melebihi batas ${MAX_LAHAN}`;
+    return "";
+  }
+  function applyOne(list, s) {
+    const idx = s.lama ? list.findIndex((x) => x.kode === s.lama.kode) : -1;
+    if (s.jenis !== "tambah" && idx < 0) return { err: "lokasi yang diganti/dihapus sudah tidak ada di daftar" };
+    if (s.baru && list.some((x, i) => x.kode === s.baru.kode && i !== idx)) return { err: "KDKMP pengganti/tambahan sudah ada di daftar" };
+    const next = list.slice();
+    const nb = s.baru ? { ...s.baru, pw: pwName(s.pw), src: s.jenis, usulId: s.id, tglSetuju: s.ditinjau_pada } : null;
+    if (s.jenis === "hapus") next.splice(idx, 1);
+    else if (s.jenis === "ganti") next[idx] = nb;
+    else next.push(nb);
+    const e = batasErr(next);
+    return e ? { err: e } : { list: next };
+  }
+  function compute() {
+    const lists = new Map();
+    for (const r of DATA.ringkasan) lists.set(pwCode(r.pw), []);
+    for (const x of DATA.lokasi) { const c = pwCode(x.pw); if (!lists.has(c)) lists.set(c, []); lists.get(c).push({ ...x, src: "awal" }); }
+    for (const l of lists.values()) l.sort((a, b) => a.urut - b.urut);
+    const gagal = new Map();
+    const appr = USUL.filter((s) => s.status === "disetujui").sort((a, b) => ms(a.ditinjau_pada) - ms(b.ditinjau_pada) || (a.id < b.id ? -1 : 1));
+    for (const s of appr) {
+      const l = lists.get(s.pw); if (!l) continue;
+      const r = applyOne(l, s);
+      if (r.err) gagal.set(s.id, r.err); else lists.set(s.pw, r.list);
+    }
+    let no = 0; const all = [];
+    for (const r of DATA.ringkasan) {
+      const l = lists.get(pwCode(r.pw)) || [];
+      l.forEach((x, i) => { x.urut = i + 1; x.no = ++no; all.push(x); });
+    }
+    EFF = { lists, gagal, all };
+  }
+  const pending = (code) => USUL.filter((s) => s.pw === code && s.status === "diajukan").sort((a, b) => ms(a.dibuat_pada) - ms(b.dibuat_pada));
+  function proyeksi(code, kecuali) {
+    let l = EFF.lists.get(code) || [];
+    for (const s of pending(code)) { if (s.id === kecuali) continue; const r = applyOne(l, s); if (!r.err) l = r.list; }
+    return l;
+  }
+  const kodeTerkunci = (code) => { const m = new Map(); for (const s of pending(code)) { if (s.lama) m.set(s.lama.kode, s); if (s.baru) m.set(s.baru.kode, s); } return m; };
+
+  // ---------------- tampilan ----------------
   function start() {
     $("#login").classList.add("hidden"); $("#app").classList.remove("hidden");
-    const L = DATA.lokasi, R = DATA.ringkasan;
     $("#meta").textContent = `${DATA.pw_nama ? DATA.pw_nama + " · " : "Lokus per Perwakilan BPKP · "}maksimal 10 lokasi per Perwakilan · data portal ${DATA.generated}`;
-    $("#foot").textContent = `Sumber: ${DATA.sumber}. Disusun untuk pengawasan pembangunan gedung KDKMP Triwulan IV 2026.`;
-    const c = (p) => L.filter((x) => x.kat.startsWith(p)).length;
-    const k = [[R.length, "Perwakilan /\nkab/kota lokus", "var(--navy)"], [L.length, "lokasi uji petik\nKDKMP", "var(--navy)"],
+    $("#foot").textContent = `Sumber: ${DATA.sumber}. Usulan perubahan lokasi bersumber dari populasi BNBA KDKMP per wilayah kerja Perwakilan. Disusun untuk pengawasan pembangunan gedung KDKMP Triwulan IV 2026.`;
+    const R = DATA.ringkasan;
+    $("#fPw").innerHTML = (R.length > 1 ? `<option value="">Semua Perwakilan (${R.length})</option>` : "") + R.map((r) => `<option value="${esc(r.pw)}">${r.no}. ${esc(short(r.pw))} — ${esc(title(r.kab))}</option>`).join("");
+    $("#fKat").innerHTML = `<option value="">Semua kategori</option>` + KATS.map(([v, , l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
+    $("#uPw").innerHTML = `<option value="">Semua Perwakilan</option>` + R.map((r) => `<option value="${pwCode(r.pw)}">${r.no}. ${esc(short(r.pw))}</option>`).join("");
+    $("#uPwWrap").classList.toggle("hidden", ME.role !== "D302");
+    $("#uSt").value = ME.role === "D302" ? "diajukan" : "";
+    $("#daftarNote").textContent = ME.role === "D302"
+      ? "D302 dapat meninjau usulan pada tab Usulan Perubahan, dan dapat mengusulkan perubahan untuk Perwakilan yang dipilih. Kolom Perubahan menandai lokasi hasil usulan yang disetujui."
+      : "Ganti, hapus, atau tambah lokasi diajukan sebagai usulan dan baru berlaku setelah disetujui D302. Pilihan KDKMP pengganti/tambahan diambil dari populasi BNBA wilayah kerja Perwakilan.";
+    if (!started) { show("ring"); started = true; }
+    refresh();
+  }
+  function refresh() {
+    if (!DATA) return;
+    compute(); renderKpi(); renderRing(); render(); renderUsul();
+    const n = USUL.filter((s) => s.status === "diajukan").length;
+    $("#usulCnt").textContent = n; $("#usulCnt").classList.toggle("hidden", !n);
+  }
+  function renderKpi() {
+    const L = EFF.all, c = (p) => L.filter((x) => x.kat.startsWith(p)).length;
+    const k = [[DATA.ringkasan.length, "Perwakilan\nBPKP", "var(--navy)"], [L.length, "lokasi uji petik\nKDKMP", "var(--navy)"],
       [c("(4)"), "(4) sudah\nberoperasi", "var(--blue)"], [c("(2)"), "(2) mandek\n> 3 bulan", "var(--red)"],
       [c("(1)"), "(1) terbangun dgn\nkelengkapan", "var(--ink)"], [c("(3)"), "(3) belum\nmemiliki lahan", "var(--ink)"]];
     $("#kpis").innerHTML = k.map(([n, l, col]) => `<div class="kpi" style="border-left-color:${col}"><div class="n" style="color:${col}">${fmt(n)}</div><div class="l">${esc(l).replace("\n", "<br>")}</div></div>`).join("");
-
-    const cell = (v, cls) => v ? `<td class="num ${cls || ""}">${fmt(v)}</td>` : `<td class="num z">–</td>`;
-    $("#tblRing").innerHTML = `<thead><tr><th class="num">No</th><th>Perwakilan</th><th>Lokasi kantor</th><th>Kab/Kota lokus</th><th>Dasar pemilihan</th><th class="num">(4) Ops</th><th class="num">(2) Mandek</th><th class="num">(1) Bangun</th><th class="num">(3) Lahan</th><th class="num">Jml</th></tr></thead><tbody>` +
-      R.map((r) => `<tr class="click" data-pw="${esc(r.pw)}"><td class="no">${r.no}</td><td>${esc(short(r.pw))}</td><td>${esc(r.kantor)}</td><td><span class="dot" style="color:${tierColor(r.dasar)}">●</span> ${esc(title(r.kab))}</td><td style="max-width:360px">${esc(r.dasar)}</td>${cell(r.l4, "b4")}${cell(r.l2, "b2")}${cell(r.l1)}${cell(r.l3)}<td class="num"><b>${fmt(r.tot)}</b></td></tr>`).join("") + `</tbody>`;
-    $("#tblRing").querySelectorAll("tr.click").forEach((tr) => tr.addEventListener("click", () => { $("#fPw").value = tr.dataset.pw; show("daftar"); render(); }));
-
-    $("#fPw").innerHTML = `<option value="">Semua Perwakilan (${R.length})</option>` + R.map((r) => `<option value="${esc(r.pw)}">${r.no}. ${esc(short(r.pw))} — ${esc(title(r.kab))}</option>`).join("");
-    $("#fKat").innerHTML = `<option value="">Semua kategori</option>` + KATS.map(([v, , l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
-    ["#fPw", "#fKat"].forEach((s) => $(s).addEventListener("change", render));
-    $("#fQ").addEventListener("input", render);
-    render();
   }
+  function renderRing() {
+    const cell = (v, cls) => v ? `<td class="num ${cls || ""}">${fmt(v)}</td>` : `<td class="num z">–</td>`;
+    $("#tblRing").innerHTML = `<thead><tr><th class="num">No</th><th>Perwakilan</th><th>Lokasi kantor</th><th>Kab/Kota lokus</th><th>Dasar pemilihan</th><th class="num">(4) Ops</th><th class="num">(2) Mandek</th><th class="num">(1) Bangun</th><th class="num">(3) Lahan</th><th class="num">Jml</th><th class="num">Usulan<br>menunggu</th></tr></thead><tbody>` +
+      DATA.ringkasan.map((r) => {
+        const code = pwCode(r.pw), k = komposisi(EFF.lists.get(code) || []), np = pending(code).length;
+        return `<tr class="click" data-pw="${esc(r.pw)}"><td class="no">${r.no}</td><td>${esc(short(r.pw))}</td><td>${esc(r.kantor)}</td><td><span class="dot" style="color:${tierColor(r.dasar)}">●</span> ${esc(title(r.kab))}</td><td style="max-width:360px">${esc(r.dasar)}</td>${cell(k.k4, "b4")}${cell(k.k2, "b2")}${cell(k.k1)}${cell(k.k3)}<td class="num"><b>${fmt(k.n)}</b></td>${np ? `<td class="num"><span class="st st-diajukan">${np}</span></td>` : `<td class="num z">–</td>`}</tr>`;
+      }).join("") + `</tbody>`;
+  }
+  $("#tblRing").addEventListener("click", (ev) => { const tr = ev.target.closest("tr.click"); if (!tr) return; $("#fPw").value = tr.dataset.pw; show("daftar"); render(); });
 
   function filtered() {
     const pw = $("#fPw").value, kat = $("#fKat").value, q = $("#fQ").value.trim().toLowerCase();
-    return DATA.lokasi.filter((x) => (!pw || x.pw === pw) && (!kat || x.kat === kat) &&
+    return EFF.all.filter((x) => (!pw || x.pw === pw) && (!kat || x.kat === kat) &&
       (!q || [x.desa, x.kec, x.kode, x.nama, x.kab, x.nik].some((v) => String(v || "").toLowerCase().includes(q))));
   }
+  const ketPerubahan = (x) => x.src === "awal" ? "" : `${x.src === "ganti" ? "Pengganti" : "Tambahan"} · disetujui ${tgl(x.tglSetuju)}`;
   function render() {
-    const rows = filtered();
-    $("#count").textContent = `${fmt(rows.length)} lokasi ditampilkan dari ${fmt(DATA.lokasi.length)}`;
-    $("#tblDaftar").innerHTML = `<thead><tr><th class="num">No</th><th>Perwakilan</th><th>Kab/Kota</th><th class="num">Urut</th><th>Kategori</th><th>Kecamatan</th><th>Desa/Kelurahan</th><th>Kode Desa</th><th>NIK Koperasi</th><th>Nama Koperasi</th><th>Alasan pemilihan</th><th>Peta</th></tr></thead><tbody>` +
-      rows.map((x) => { const [, cls, lab] = katInfo(x.kat);
+    if (!EFF) return;
+    const rows = filtered(), selPw = $("#fPw").value, code = selPw ? pwCode(selPw) : "";
+    $("#count").textContent = `${fmt(rows.length)} lokasi ditampilkan dari ${fmt(EFF.all.length)}`;
+    // panel komposisi + tombol tambah untuk Perwakilan terpilih
+    if (code && canPropose(code)) {
+      const now = komposisi(EFF.lists.get(code) || []), pj = komposisi(proyeksi(code)), np = pending(code).length;
+      const full = pj.n >= MAXN;
+      $("#komp").innerHTML = `<b>${esc(short(selPw))}</b><span class="sep"></span>
+        <span class="chip ${now.n >= MAXN ? "full" : ""}">${now.n}/${MAXN} lokasi</span><span class="chip">(4) ${now.k4}</span><span class="chip">(2) ${now.k2}</span><span class="chip">(1) ${now.k1}</span><span class="chip ${now.k3 >= MAX_LAHAN ? "full" : ""}">(3) ${now.k3}/${MAX_LAHAN}</span>
+        ${np ? `<span class="sep"></span><span class="sub">${np} usulan menunggu · jika disetujui: ${pj.n} lokasi, (3) ${pj.k3}</span>` : ""}
+        <span class="grow"></span><button class="btn btn-navy" id="btnTambah" type="button" ${full ? "disabled" : ""} title="${full ? "Daftar (termasuk usulan menunggu) sudah 10 lokasi; usulkan ganti atau hapus" : ""}">+ Usulkan tambah lokasi</button>`;
+      $("#komp").classList.remove("hidden");
+      $("#btnTambah").addEventListener("click", () => openPicker(code, null));
+    } else $("#komp").classList.add("hidden");
+    const aksiOn = rows.some((x) => canPropose(pwCode(x.pw)));
+    const lock = new Map(); for (const s of USUL) if (s.status === "diajukan" && s.lama) lock.set(s.lama.kode, s);
+    $("#tblDaftar").innerHTML = `<thead><tr><th class="num">No</th>${aksiOn ? "<th>Usulan</th>" : ""}<th>Perwakilan</th><th>Kab/Kota</th><th class="num">Urut</th><th>Kategori</th><th>Nama Koperasi</th><th>Kecamatan</th><th>Desa/Kelurahan</th><th>Kode Desa</th><th>NIK Koperasi</th><th>Alasan pemilihan</th><th>Peta</th><th>Perubahan</th></tr></thead><tbody>` +
+      rows.map((x) => {
         const map = (x.lat && x.lon) ? `<a href="https://www.google.com/maps?q=${encodeURIComponent(x.lat + "," + x.lon)}" target="_blank" rel="noopener">Buka</a>` : `<span class="z">–</span>`;
-        return `<tr><td class="num">${x.no}</td><td>${esc(short(x.pw))}</td><td>${esc(title(x.kab))}</td><td class="num">${x.urut}</td><td><span class="badge ${cls}">${esc(lab)}</span></td><td>${esc(x.kec)}</td><td>${esc(x.desa)}</td><td style="white-space:nowrap">${esc(x.kode)}</td><td>${esc(x.nik)}</td><td style="min-width:220px">${esc(x.nama)}</td><td style="min-width:260px">${esc(x.alasan)}</td><td>${map}</td></tr>`; }).join("") + `</tbody>`;
+        const p = lock.get(x.kode), c = pwCode(x.pw), ket = ketPerubahan(x);
+        const chg = [ket ? `<span class="st st-disetujui">${esc(ket)}</span>` : "", p ? `<span class="st st-diajukan">Usulan ${p.jenis === "hapus" ? "hapus" : "ganti"} menunggu</span>` : ""].filter(Boolean).join("<br>");
+        const aksi = canPropose(c) ? `<button class="mini" data-act="ganti" data-pw="${c}" data-kode="${esc(x.kode)}" ${p ? "disabled" : ""}>Ganti</button> <button class="mini r" data-act="hapus" data-pw="${c}" data-kode="${esc(x.kode)}" ${p ? "disabled" : ""}>Hapus</button>` : "";
+        return `<tr><td class="num">${x.no}</td>${aksiOn ? `<td style="white-space:nowrap">${aksi}</td>` : ""}<td>${esc(short(x.pw))}</td><td style="min-width:110px">${esc(title(x.kab))}</td><td class="num">${x.urut}</td><td>${badge(x.kat)}</td><td style="min-width:220px">${esc(x.nama)}</td><td>${esc(x.kec)}</td><td>${esc(x.desa)}</td><td style="white-space:nowrap">${esc(x.kode)}</td><td>${esc(x.nik)}</td><td style="min-width:260px">${esc(x.alasan)}</td><td>${map}</td><td class="chg" style="min-width:150px">${chg || '<span class="z">–</span>'}</td></tr>`;
+      }).join("") + `</tbody>`;
   }
+  $("#tblDaftar").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-act]"); if (!b || b.disabled) return;
+    const lama = (EFF.lists.get(b.dataset.pw) || []).find((x) => x.kode === b.dataset.kode); if (!lama) return;
+    if (b.dataset.act === "ganti") openPicker(b.dataset.pw, lama); else openHapus(b.dataset.pw, lama);
+  });
   function show(which) {
-    const r = which === "ring";
-    $("#t-ring").setAttribute("aria-selected", r); $("#t-daftar").setAttribute("aria-selected", !r);
-    $("#v-ring").classList.toggle("hidden", !r); $("#v-daftar").classList.toggle("hidden", r);
+    for (const k of ["ring", "daftar", "usul"]) { $("#t-" + k).setAttribute("aria-selected", k === which); $("#v-" + k).classList.toggle("hidden", k !== which); }
   }
-  $("#t-ring").addEventListener("click", () => show("ring"));
-  $("#t-daftar").addEventListener("click", () => show("daftar"));
+  for (const k of ["ring", "daftar", "usul"]) $("#t-" + k).addEventListener("click", () => show(k));
+  ["#fPw", "#fKat"].forEach((s) => $(s).addEventListener("change", render));
+  $("#fQ").addEventListener("input", render);
 
   $("#csv").addEventListener("click", () => {
     const cols = ["no", "pw", "prov", "kab", "urut", "kat", "kec", "desa", "kode", "nik", "nama", "alasan", "lat", "lon"];
-    const head = ["No", "Perwakilan", "Provinsi", "Kabupaten/Kota", "Urut", "Kategori", "Kecamatan", "Desa/Kelurahan", "Kode Desa", "NIK Koperasi", "Nama Koperasi", "Alasan pemilihan", "Latitude", "Longitude"];
+    const head = ["No", "Perwakilan", "Provinsi", "Kabupaten/Kota", "Urut", "Kategori", "Kecamatan", "Desa/Kelurahan", "Kode Desa", "NIK Koperasi", "Nama Koperasi", "Alasan pemilihan", "Latitude", "Longitude", "Perubahan"];
     const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const csv = "﻿" + [head.map(q).join(";")].concat(filtered().map((x) => cols.map((c) => q(x[c])).join(";"))).join("\r\n");
+    const csv = "﻿" + [head.map(q).join(";")].concat(filtered().map((x) => cols.map((c) => q(x[c])).concat(q(ketPerubahan(x))).join(";"))).join("\r\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     a.download = "lokus_uji_petik_kdkmp_tw4_2026.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
+
+  // ---------------- tab usulan ----------------
+  const lokCell = (x) => x ? `${badge(x.kat)}<div style="margin-top:3px;font-weight:600">${esc(x.nama)}</div><div class="sub">${esc(x.desa)}, ${esc(x.kec)} · ${esc(title(x.kab))}<br>${esc(x.kode)}</div>` : `<span class="z">–</span>`;
+  function renderUsul() {
+    const st = $("#uSt").value, pw = $("#uPw").value, q = $("#uQ").value.trim().toLowerCase();
+    const rows = USUL.filter((s) => (!st || s.status === st) && (!pw || s.pw === pw) &&
+      (!q || [s.lama && s.lama.nama, s.baru && s.baru.nama, s.lama && s.lama.desa, s.baru && s.baru.desa, s.dibuat_nama, s.dibuat_oleh, s.alasan].some((v) => String(v || "").toLowerCase().includes(q))))
+      .sort((a, b) => (a.status === "diajukan" ? 0 : 1) - (b.status === "diajukan" ? 0 : 1) || ms(b.dibuat_pada) - ms(a.dibuat_pada));
+    $("#uCount").textContent = `${fmt(rows.length)} usulan ditampilkan dari ${fmt(USUL.length)}`;
+    if (!rows.length) { $("#tblUsul").innerHTML = `<tbody><tr><td style="padding:22px;text-align:center;color:var(--mute)">${USUL.length ? "Tidak ada usulan dengan filter ini." : "Belum ada usulan perubahan lokasi."}</td></tr></tbody>`; return; }
+    $("#tblUsul").innerHTML = `<thead><tr><th>Diajukan</th><th>Perwakilan</th><th>Jenis</th><th>Lokasi semula</th><th>Lokasi usulan</th><th>Alasan usulan</th><th>Status</th><th>Aksi</th></tr></thead><tbody>` +
+      rows.map((s) => {
+        let aksi = "";
+        if (s.status === "diajukan" && ME.role === "D302") aksi = `<button class="mini" data-uact="tinjau" data-id="${s.id}">Tinjau</button>`;
+        else if (s.status === "diajukan" && ME.pw === s.pw) aksi = `<button class="mini r" data-uact="batal" data-id="${s.id}">Batalkan</button>`;
+        const g = EFF.gagal.get(s.id);
+        const stc = `<span class="st st-${s.status}">${STATUS[s.status] || esc(s.status)}</span>` +
+          (s.ditinjau_pada ? `<div class="sub" style="margin-top:3px">${esc(s.ditinjau_nama || s.ditinjau_oleh)}<br>${tgl(s.ditinjau_pada)}</div>` : "") +
+          (s.catatan ? `<div class="sub" style="margin-top:3px;color:var(--ink)">“${esc(s.catatan)}”</div>` : "") +
+          (g ? `<div class="sub" style="color:var(--red);margin-top:3px">Tidak dapat diterapkan: ${esc(g)}</div>` : "");
+        return `<tr><td style="white-space:nowrap">${tgl(s.dibuat_pada)}<div class="sub">${esc(s.dibuat_nama || s.dibuat_oleh)}</div></td><td>${esc(short(pwName(s.pw)))}</td><td><b>${JENIS[s.jenis] || esc(s.jenis)}</b></td><td style="min-width:200px">${lokCell(s.lama)}</td><td style="min-width:200px">${lokCell(s.baru)}</td><td style="min-width:220px">${esc(s.alasan)}</td><td style="min-width:150px">${stc}</td><td>${aksi}</td></tr>`;
+      }).join("") + `</tbody>`;
+  }
+  ["#uSt", "#uPw"].forEach((s) => $(s).addEventListener("change", renderUsul));
+  $("#uQ").addEventListener("input", renderUsul);
+  $("#tblUsul").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-uact]"); if (!b) return;
+    const s = USUL.find((x) => x.id === b.dataset.id); if (!s) return;
+    if (b.dataset.uact === "tinjau") openTinjau(s); else openBatal(s);
+  });
+
+  // ---------------- dialog ----------------
+  const dlg = $("#dlg");
+  const openDlg = (t, body, foot) => { $("#dlgTitle").textContent = t; $("#dlgBody").innerHTML = body; $("#dlgFoot").innerHTML = foot; if (!dlg.open) dlg.showModal(); };
+  const closeDlg = () => dlg.open && dlg.close();
+  $("#dlgX").addEventListener("click", closeDlg);
+  const lokBox = (x, h, cls) => `<div class="box ${cls || ""}"><div class="h">${esc(h)}</div>${badge(x.kat)} <b>${esc(x.nama)}</b><div class="sub">${esc(x.desa)}, Kec. ${esc(x.kec)}, ${esc(title(x.kab))} · Kode desa ${esc(x.kode)}${x.nik ? " · NIK " + esc(x.nik) : ""}</div><div class="sub" style="color:var(--ink)">${esc(x.alasan)}</div></div>`;
+  const kompTeks = (l) => { const c = komposisi(l); return `${c.n} lokasi · (4) ${c.k4} · (2) ${c.k2} · (1) ${c.k1} · (3) ${c.k3}`; };
+  const S = (v, n) => String(v ?? "").trim().slice(0, n);
+  const N = (v) => (typeof v === "number" && isFinite(v) ? v : null);
+  const bersih = (x) => ({ kat: x.kat, prov: S(x.prov, 80), kab: S(x.kab, 80), kec: S(x.kec, 80), desa: S(x.desa, 80), kode: S(x.kode, 20),
+    nik: S(x.nik, 30), nama: S(x.nama, 200), alasan: S(x.alasan, 300), lat: N(x.lat), lon: N(x.lon) });
+  async function kirim(btn, fn, okMsg) {
+    btn.disabled = true; const old = btn.textContent; btn.textContent = "Menyimpan…";
+    try { await fn(); closeDlg(); toast(okMsg); }
+    catch (e) { btn.disabled = false; btn.textContent = old; toast("Gagal menyimpan: " + (e.code === "permission-denied" ? "ditolak oleh aturan akses (periksa status usulan atau hak akses)" : (e.message || e)), true); }
+  }
+  const usulBaru = (code, jenis, lama, baru, alasan) => addDoc(collection(db, "usulan_tw4"), {
+    pw: code, jenis, lama: lama ? bersih(lama) : null, baru: baru ? bersih(baru) : null, alasan: S(alasan, 1000),
+    status: "diajukan", dibuat_oleh: ME.email, dibuat_nama: ME.nama, dibuat_pada: serverTimestamp() });
+
+  // ---- hapus
+  function openHapus(code, lama) {
+    const after = applyOne(proyeksi(code), { jenis: "hapus", lama, baru: null, pw: code });
+    openDlg(`Usulkan hapus lokasi · ${short(pwName(code))}`,
+      `${lokBox(lama, "Lokasi yang diusulkan dihapus")}
+       <p class="sub" style="margin:10px 0 0">Setelah dihapus (termasuk usulan lain yang menunggu): ${after.list ? kompTeks(after.list) : "–"}. Slot yang kosong dapat diisi melalui usulan tambah lokasi.</p>
+       <label for="hAlasan">Alasan usulan (wajib, minimal 10 karakter)</label><textarea id="hAlasan" maxlength="1000" placeholder="mis. Akses ke desa terputus banjir; KDKMP sudah diuji petik oleh tim lain"></textarea>`,
+      `<span class="msg" id="hMsg"></span><button class="btn btn-ghost" type="button" id="hBatal">Batal</button><button class="btn btn-red" type="button" id="hKirim" disabled>Kirim usulan hapus</button>`);
+    const v = () => { const a = $("#hAlasan").value.trim(); const e = after.err || (a.length < 10 ? "Isi alasan minimal 10 karakter." : ""); $("#hMsg").textContent = after.err ? "Tidak dapat diusulkan: " + after.err : ""; $("#hMsg").className = "msg bad"; $("#hKirim").disabled = !!e; };
+    $("#hAlasan").addEventListener("input", v); v();
+    $("#hBatal").addEventListener("click", closeDlg);
+    $("#hKirim").addEventListener("click", () => kirim($("#hKirim"), () => usulBaru(code, "hapus", lama, null, $("#hAlasan").value), "Usulan hapus terkirim dan menunggu persetujuan D302."));
+  }
+
+  // ---- ganti / tambah: pilih KDKMP dari populasi BNBA wilayah kerja
+  async function unpack(b64) {
+    const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    return JSON.parse(await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream("gzip"))).text());
+  }
+  async function loadKand(code) {
+    if (KAND[code]) return KAND[code];
+    const m = await getDoc(doc(db, "populasi_pw", code + "_manifest"));
+    if (!m.exists()) throw new Error("Data populasi Perwakilan belum tersedia.");
+    const man = JSON.parse(m.data().json);
+    const ds = async (name) => {
+      const n = (man.datasets[name] || {}).chunks || 0; let cols = [], rows = [];
+      for (let i = 0; i < n; i++) { const s = await getDoc(doc(db, "populasi_pw", `${code}_${name}_${i}`)); const d = await unpack(s.data().d); cols = d.cols; rows = rows.concat(d.rows); }
+      return rows.map((r) => Object.fromEntries(cols.map((c, j) => [c, r[j]])));
+    };
+    const [g, o, b] = await Promise.all(["gerai", "beroperasi", "belum_lahan"].map(ds));
+    const EXCL = new Set(["PAPUA SELATAN", "PAPUA PEGUNUNGAN"]);
+    const dec = (v) => Number(v || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+    const gk = new Map(g.map((r) => [r["Kode Desa"], r]));
+    const out = new Map();
+    const put = (x) => { if (!x.kode || EXCL.has(x.prov) || out.has(x.kode)) return; out.set(x.kode, x); };
+    for (const r of o) {
+      const k = r["Kategori uji petik TW IV"] || "", gg = gk.get(r["Kode Desa"]) || {};
+      let lat = N(gg.Latitude), lon = N(gg.Longitude);
+      if (lat == null && r["Koordinat SIMKOPDES"]) { const p = String(r["Koordinat SIMKOPDES"]).split(",").map(Number); if (p.length === 2 && p.every(isFinite)) [lat, lon] = p; }
+      const base = { prov: r.Provinsi, kab: r["Kabupaten/Kota"], kec: r.Kecamatan, desa: r["Desa/Kelurahan"], kode: r["Kode Desa"], nik: r["NIK Koperasi (master)"], nama: r["Nama Koperasi (sumber)"], lat, lon };
+      if (k.startsWith("Prioritas")) put({ ...base, kat: KATS[0][0], alasan: `${r["Titik operasional 84 (Bahan 2 Okt 2026)"] || "Titik operasional 84"}; belum pernah diuji petik BPKP` });
+      else if (k.startsWith("Potensial")) put({ ...base, kat: KATS[1][0], alasan: "Beroperasi, belum pernah diuji petik BPKP" });
+      else put({ ...base, kat: KATS[1][0], alasan: "Beroperasi", blok: "Sudah diuji petik BPKP (TW II/III)" });
+    }
+    for (const r of g) {
+      const base = { prov: r.Provinsi, kab: r["Kabupaten/Kota"], kec: r.Kecamatan, desa: r["Desa/Kelurahan"], kode: r["Kode Desa"], nik: r["NIK Koperasi (master)"], nama: r["Nama Koperasi (portal)"], lat: N(r.Latitude), lon: N(r.Longitude) };
+      if (r["(2) Mandek > 3 bulan"] === 1) put({ ...base, kat: KATS[2][0], alasan: `Progres ${dec(r["Progres 6 Okt (%)"])}%, lewat target ${fmt(r["Hari lewat target"])} hari (${r["Kategori keterlambatan"] || "-"})` });
+      else if (r["(1) Terbangun dengan kelengkapan"] === 1 && r["(4) Beroperasi"] !== 1) put({ ...base, kat: KATS[3][0], alasan: `Gedung 100%, sarpras ${fmt(r["Item sarpras tiba/terpasang"])} item tiba/terpasang (${r["Status kelengkapan sarpras"] || "-"}) — gali hambatan kelengkapan` });
+    }
+    for (const r of b) put({ prov: r.Provinsi, kab: r["Kabupaten/Kota"], kec: r.Kecamatan, desa: r["Desa/Kelurahan"], kode: r["Kode Desa"], nik: r["NIK Koperasi"], nama: r["Nama Koperasi"], lat: null, lon: null, kat: KATS[4][0], alasan: "Kode desa belum ada di data pemetaan lahan portal" });
+    const ord = { 4: 0, 2: 1, 1: 2, 3: 3 };
+    KAND[code] = [...out.values()].sort((a, b) => ord[a.kat[1]] - ord[b.kat[1]] || String(a.kab).localeCompare(b.kab) || String(a.kec).localeCompare(b.kec) || String(a.desa).localeCompare(b.desa));
+    return KAND[code];
+  }
+
+  let PICK = null;
+  async function openPicker(code, lama) {
+    const jenis = lama ? "ganti" : "tambah";
+    PICK = { code, lama, jenis, sel: null, list: null };
+    openDlg(`${lama ? "Usulkan ganti lokasi" : "Usulkan tambah lokasi"} · ${short(pwName(code))}`,
+      `<div class="${lama ? "two" : ""}">${lama ? lokBox(lama, "Lokasi semula") : ""}<div class="box" id="kSel"><div class="h">KDKMP usulan</div><span class="sub">Pilih satu KDKMP dari tabel di bawah.</span></div></div>
+       <div class="toolbar" style="margin-top:12px">
+         <div class="f"><label for="kKat">Kategori</label><select id="kKat"><option value="">Semua kategori uji petik</option><option value="(4)">(4) Sudah beroperasi</option><option value="(2)">(2) Mandek &gt; 3 bulan</option><option value="(1)">(1) Terbangun dengan kelengkapan</option><option value="(3)">(3) Belum memiliki lahan</option></select></div>
+         <div class="f"><label for="kKab">Kabupaten/Kota</label><select id="kKab"><option value="">Semua kab/kota</option></select></div>
+         <div class="f"><label for="kQ">Cari (desa, kecamatan, nama, kode)</label><input id="kQ" type="search"></div>
+       </div>
+       <div class="count" id="kCount">Memuat populasi KDKMP wilayah kerja…</div>
+       <div class="tablewrap" style="max-height:36vh"><table id="kTbl"></table></div>
+       <label for="kAlasan">Alasan usulan (wajib, minimal 10 karakter)</label><textarea id="kAlasan" maxlength="1000" placeholder="mis. Lokasi semula sulit dijangkau; KDKMP pengganti satu kecamatan dengan lokasi lain sehingga efisien"></textarea>`,
+      `<span class="msg" id="kMsg"></span><button class="btn btn-ghost" type="button" id="kBatal">Batal</button><button class="btn btn-navy" type="button" id="kKirim" disabled>Kirim usulan</button>`);
+    $("#kBatal").addEventListener("click", closeDlg);
+    let list;
+    try { list = await loadKand(code); } catch (e) { $("#kCount").textContent = "Gagal memuat populasi: " + (e.code || e.message); return; }
+    if (!PICK || PICK.code !== code || PICK.lama !== lama || !dlg.open) return;
+    PICK.list = list;
+    $("#kKab").innerHTML += [...new Set(list.map((x) => x.kab))].sort().map((k) => `<option value="${esc(k)}">${esc(title(k))}</option>`).join("");
+    if (lama) { $("#kKat").value = lama.kat.slice(0, 3); $("#kKab").value = [...$("#kKab").options].some((o) => o.value === lama.kab) ? lama.kab : ""; }
+    ["#kKat", "#kKab"].forEach((s) => $(s).addEventListener("change", renderKand));
+    $("#kQ").addEventListener("input", renderKand);
+    $("#kAlasan").addEventListener("input", validasiPick);
+    $("#kTbl").addEventListener("click", (ev) => {
+      const tr = ev.target.closest("tr[data-k]"); if (!tr || tr.classList.contains("dis")) return;
+      PICK.sel = PICK.list.find((x) => x.kode === tr.dataset.k) || null;
+      $("#kTbl").querySelectorAll("tr.on").forEach((r) => r.classList.remove("on")); tr.classList.add("on");
+      $("#kSel").outerHTML = lokBox(PICK.sel, "KDKMP usulan", "sel").replace('class="box sel"', 'class="box sel" id="kSel"');
+      validasiPick();
+    });
+    $("#kKirim").addEventListener("click", () => kirim($("#kKirim"), () => usulBaru(code, jenis, lama, PICK.sel, $("#kAlasan").value),
+      `Usulan ${jenis} terkirim dan menunggu persetujuan D302.`));
+    renderKand(); validasiPick();
+  }
+  function renderKand() {
+    if (!PICK || !PICK.list) return;
+    const kat = $("#kKat").value, kab = $("#kKab").value, q = $("#kQ").value.trim().toLowerCase();
+    const ada = new Set((EFF.lists.get(PICK.code) || []).map((x) => x.kode)), kunci = kodeTerkunci(PICK.code);
+    const rows = PICK.list.filter((x) => (!kat || x.kat.startsWith(kat)) && (!kab || x.kab === kab) &&
+      (!q || [x.desa, x.kec, x.nama, x.kode, x.nik].some((v) => String(v || "").toLowerCase().includes(q))));
+    const LIM = 300;
+    $("#kCount").textContent = `${fmt(rows.length)} KDKMP sesuai filter dari ${fmt(PICK.list.length)} KDKMP kategori uji petik di wilayah kerja` + (rows.length > LIM ? ` · ditampilkan ${LIM} pertama, persempit dengan filter atau pencarian` : "");
+    $("#kTbl").innerHTML = `<thead><tr><th></th><th>Kategori</th><th>Kab/Kota</th><th>Kecamatan</th><th>Desa/Kelurahan</th><th>Nama Koperasi</th><th>Keterangan</th></tr></thead><tbody>` +
+      rows.slice(0, LIM).map((x) => {
+        const why = x.blok || (ada.has(x.kode) ? "Sudah ada di daftar lokasi" : kunci.has(x.kode) ? "Sedang dalam usulan lain" : "");
+        const on = PICK.sel && PICK.sel.kode === x.kode;
+        return `<tr data-k="${esc(x.kode)}" class="click ${why ? "dis" : ""} ${on ? "on" : ""}"><td>${why ? "" : '<span class="pick"></span>'}</td><td>${badge(x.kat)}</td><td>${esc(title(x.kab))}</td><td>${esc(x.kec)}</td><td>${esc(x.desa)}<div class="sub">${esc(x.kode)}</div></td><td style="min-width:200px">${esc(x.nama)}</td><td style="min-width:220px">${why ? `<b style="color:var(--mute)">${esc(why)}</b>` : esc(x.alasan)}</td></tr>`;
+      }).join("") + `</tbody>`;
+  }
+  function validasiPick() {
+    if (!PICK) return;
+    const a = $("#kAlasan").value.trim(); let msg = "", good = false;
+    if (!PICK.sel) msg = "Pilih KDKMP usulan.";
+    else {
+      const r = applyOne(proyeksi(PICK.code), { jenis: PICK.jenis, lama: PICK.lama, baru: PICK.sel, pw: PICK.code });
+      if (r.err) msg = "Tidak dapat diusulkan: " + r.err;
+      else if (a.length < 10) msg = "Isi alasan minimal 10 karakter.";
+      else { good = true; msg = `Setelah disetujui (termasuk usulan lain yang menunggu): ${kompTeks(r.list)}` + (PICK.lama && PICK.lama.kat.slice(0, 3) !== PICK.sel.kat.slice(0, 3) ? " · kategori berubah" : ""); }
+    }
+    $("#kMsg").textContent = msg; $("#kMsg").className = "msg " + (good ? "good" : "bad"); $("#kKirim").disabled = !good;
+  }
+
+  // ---- tinjau (D302) dan batalkan (Perwakilan)
+  function openTinjau(s) {
+    const l = EFF.lists.get(s.pw) || [], r = applyOne(l, s);
+    openDlg(`Tinjau usulan ${JENIS[s.jenis].toLowerCase()} · ${short(pwName(s.pw))}`,
+      `<div class="${s.lama && s.baru ? "two" : ""}">${s.lama ? lokBox(s.lama, s.jenis === "hapus" ? "Lokasi yang diusulkan dihapus" : "Lokasi semula") : ""}${s.baru ? lokBox(s.baru, s.jenis === "tambah" ? "Lokasi tambahan" : "Lokasi pengganti", "sel") : ""}</div>
+       <div class="box" style="margin-top:10px"><div class="h">Alasan Perwakilan</div>${esc(s.alasan)}<div class="sub" style="margin-top:4px">Diajukan ${esc(s.dibuat_nama || s.dibuat_oleh)} · ${tgl(s.dibuat_pada)}</div></div>
+       <p class="sub" style="margin:10px 0 0">Daftar saat ini: ${kompTeks(l)}${r.list ? ` → setelah disetujui: <b>${kompTeks(r.list)}</b>` : ""}</p>
+       <label for="tCat">Catatan peninjauan (wajib bila menolak)</label><textarea id="tCat" maxlength="1000"></textarea>`,
+      `<span class="msg bad" id="tMsg">${r.err ? "Tidak dapat disetujui: " + esc(r.err) : ""}</span><button class="btn btn-red" type="button" id="tTolak">Tolak</button><button class="btn btn-ok" type="button" id="tSetuju" ${r.err ? "disabled" : ""}>Setujui</button>`);
+    const upd = (status) => updateDoc(doc(db, "usulan_tw4", s.id), { status, ditinjau_oleh: ME.email, ditinjau_nama: ME.nama, ditinjau_pada: serverTimestamp(), catatan: S($("#tCat").value, 1000) });
+    $("#tSetuju").addEventListener("click", () => kirim($("#tSetuju"), () => upd("disetujui"), "Usulan disetujui; daftar lokasi diperbarui."));
+    $("#tTolak").addEventListener("click", () => {
+      if ($("#tCat").value.trim().length < 5) { $("#tMsg").textContent = "Isi catatan alasan penolakan (minimal 5 karakter)."; $("#tCat").focus(); return; }
+      kirim($("#tTolak"), () => upd("ditolak"), "Usulan ditolak.");
+    });
+  }
+  function openBatal(s) {
+    openDlg("Batalkan usulan", `<p style="margin-top:0">Batalkan usulan <b>${JENIS[s.jenis].toLowerCase()}</b> berikut? Usulan yang dibatalkan tetap tercatat di riwayat.</p><div class="${s.lama && s.baru ? "two" : ""}">${s.lama ? lokBox(s.lama, "Lokasi semula") : ""}${s.baru ? lokBox(s.baru, "Lokasi usulan", "sel") : ""}</div>`,
+      `<button class="btn btn-ghost" type="button" id="bTidak">Tidak</button><button class="btn btn-red" type="button" id="bYa">Batalkan usulan</button>`);
+    $("#bTidak").addEventListener("click", closeDlg);
+    $("#bYa").addEventListener("click", () => kirim($("#bYa"), () => updateDoc(doc(db, "usulan_tw4", s.id), { status: "dibatalkan", ditinjau_oleh: ME.email, ditinjau_nama: ME.nama, ditinjau_pada: serverTimestamp(), catatan: "Dibatalkan oleh Perwakilan pengusul" }), "Usulan dibatalkan."));
+  }
+  dlg.addEventListener("close", () => { PICK = null; });
 })();
 </script>
 </body>
