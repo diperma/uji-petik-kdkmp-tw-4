@@ -406,10 +406,14 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
   }
   function renderRing() {
     const cell = (v, cls) => v ? `<td class="num ${cls || ""}">${fmt(v)}</td>` : `<td class="num z">–</td>`;
-    $("#tblRing").innerHTML = `<thead><tr><th class="num">No</th><th>Perwakilan</th><th>Lokasi kantor</th><th>Kab/Kota lokus</th><th>Dasar pemilihan</th><th class="num">(4) Ops</th><th class="num">(2) Mandek</th><th class="num">(1) Bangun</th><th class="num">(3) Lahan</th><th class="num">Jml</th><th class="num">Usulan<br>menunggu</th></tr></thead><tbody>` +
+    $("#tblRing").innerHTML = `<thead><tr><th class="num">No</th><th>Perwakilan</th><th>Lokasi kantor</th><th>Kab/Kota lokasi uji petik</th><th>Dasar pemilihan</th><th class="num">(4) Ops</th><th class="num">(2) Mandek</th><th class="num">(1) Bangun</th><th class="num">(3) Lahan</th><th class="num">Jml</th><th class="num">Usulan<br>menunggu</th></tr></thead><tbody>` +
       DATA.ringkasan.map((r) => {
-        const code = pwCode(r.pw), k = komposisi(EFF.lists.get(code) || []), np = pending(code).length;
-        return `<tr class="click" data-pw="${esc(r.pw)}"><td class="no">${r.no}</td><td>${esc(short(r.pw))}</td><td>${esc(r.kantor)}</td><td><span class="dot" style="color:${tierColor(r.dasar)}">●</span> ${esc(title(r.kab))}</td><td style="max-width:360px">${esc(r.dasar)}</td>${cell(k.k4, "b4")}${cell(k.k2, "b2")}${cell(k.k1)}${cell(k.k3)}<td class="num"><b>${fmt(k.n)}</b></td>${np ? `<td class="num"><span class="st st-diajukan">${np}</span></td>` : `<td class="num z">–</td>`}</tr>`;
+        const code = pwCode(r.pw), lst = EFF.lists.get(code) || [], k = komposisi(lst), np = pending(code).length;
+        // kab/kota lokus di depan, kab/kota lain dari daftar lokasi efektif (abu-abu)
+        const lain = [...new Set(lst.map((x) => x.kab))].filter((kb) => kb !== r.kab);
+        const kabCell = `<span class="dot" style="color:${tierColor(r.dasar)}">●</span> ${esc(title(r.kab))}` +
+          (lain.length ? `<span class="sub">, ${lain.map((kb) => esc(title(kb))).join(", ")}</span>` : "");
+        return `<tr class="click" data-pw="${esc(r.pw)}"><td class="no">${r.no}</td><td>${esc(short(r.pw))}</td><td>${esc(r.kantor)}</td><td style="min-width:170px;max-width:260px">${kabCell}</td><td style="max-width:360px">${esc(r.dasar)}</td>${cell(k.k4, "b4")}${cell(k.k2, "b2")}${cell(k.k1)}${cell(k.k3)}<td class="num"><b>${fmt(k.n)}</b></td>${np ? `<td class="num"><span class="st st-diajukan">${np}</span></td>` : `<td class="num z">–</td>`}</tr>`;
       }).join("") + `</tbody>`;
   }
   $("#tblRing").addEventListener("click", (ev) => { const tr = ev.target.closest("tr.click"); if (!tr) return; $("#fPw").value = tr.dataset.pw; show("daftar"); render(); });
