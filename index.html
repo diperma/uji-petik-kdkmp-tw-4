@@ -135,6 +135,18 @@ tr.on .pick{border-color:var(--blue);background:radial-gradient(var(--blue) 45%,
 .toast.bad{background:var(--red)}
 @media (max-width:1000px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.top h1{font-size:18px}.kpi .n{font-size:22px}.two{grid-template-columns:1fr}}
+/* dropdown bisa dicari (combo.js) */
+.combo{position:relative}
+.combo-native{display:none!important}
+input.combo-in{width:100%;padding:10px 34px 10px 12px;border:1px solid var(--line);border-radius:6px;color:var(--ink);text-overflow:ellipsis;cursor:pointer;
+  background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%235B6472' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center/12px 8px}
+input.combo-in:focus{cursor:text;outline:2px solid var(--blue);outline-offset:0;border-color:var(--blue);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='7' cy='7' r='5' fill='none' stroke='%232866AB' stroke-width='1.8'/%3E%3Cpath d='M11 11l3.5 3.5' stroke='%232866AB' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");background-size:14px 14px}
+.combo-list{position:fixed;z-index:1000;margin:0;padding:4px 0;list-style:none;background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:0 10px 28px rgba(11,45,114,.18);overflow:auto;font-size:14px;color:var(--ink)}
+.combo-list li{padding:7px 12px;cursor:pointer;line-height:1.35}
+.combo-list li.act{background:#E3ECF7}
+.combo-list li.sel{font-weight:600;color:var(--navy)}
+.combo-list li.none{color:var(--mute);cursor:default;font-style:italic}
 </style>
 </head>
 <body>
@@ -226,6 +238,98 @@ tr.on .pick{border-color:var(--blue);background:radial-gradient(var(--blue) 45%,
 </dialog>
 <div class="toast hidden" id="toast" role="status"></div>
 
+<script>
+// Dropdown yang bisa diketik untuk mencari (combobox). Setiap <select> di halaman, termasuk yang dibuat belakangan,
+// diganti tampilannya dengan kotak isian + daftar pilihan; <select> asli tetap dipakai kode halaman (value, change, innerHTML).
+(() => {
+  const VAL = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value");
+  const IDX = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "selectedIndex");
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  let uid = 0, OPEN = null;
+
+  function enhance(sel) {
+    if (sel._combo || sel.multiple || "native" in sel.dataset) return;
+    const id = sel.id || "cb" + ++uid;
+    const wrap = document.createElement("div"); wrap.className = "combo";
+    const inp = document.createElement("input");
+    Object.assign(inp, { type: "text", className: "combo-in", id: id + "__q", autocomplete: "off", spellcheck: false });
+    inp.setAttribute("role", "combobox"); inp.setAttribute("aria-autocomplete", "list"); inp.setAttribute("aria-expanded", "false");
+    const list = document.createElement("ul"); list.className = "combo-list"; list.id = id + "__list"; list.setAttribute("role", "listbox"); list.hidden = true;
+    inp.setAttribute("aria-controls", list.id);
+    sel.parentNode.insertBefore(wrap, sel); wrap.append(inp, list, sel);
+    sel.classList.add("combo-native"); sel.tabIndex = -1; sel.setAttribute("aria-hidden", "true");
+    if (sel.id) document.querySelectorAll(`label[for="${CSS.escape(sel.id)}"]`).forEach((l) => { l.htmlFor = inp.id; });
+
+    let items = [], act = -1, openedAt = 0;
+    const label = () => { const o = sel.options[IDX.get.call(sel)]; return o ? o.text : ""; };
+    const show = () => { if (list.hidden) { inp.value = label(); inp.title = inp.value; } };
+    const hl = () => {
+      list.querySelectorAll("li[data-i]").forEach((li) => li.classList.toggle("act", +li.dataset.i === act));
+      const a = list.querySelector(`li[data-i="${act}"]`);
+      if (a) { a.scrollIntoView({ block: "nearest" }); inp.setAttribute("aria-activedescendant", a.id); } else inp.removeAttribute("aria-activedescendant");
+    };
+    const build = (q) => {
+      const words = norm(q).split(/\s+/).filter(Boolean);
+      items = [...sel.options].filter((o) => !o.disabled && !o.hidden && words.every((w) => norm(o.text).includes(w)));
+      list.innerHTML = items.length
+        ? items.map((o, i) => `<li role="option" id="${list.id}_${i}" data-i="${i}" aria-selected="${o.selected}"${o.selected ? ' class="sel"' : ""}>${esc(o.text)}</li>`).join("")
+        : `<li class="none">Tidak ditemukan</li>`;
+      act = words.length ? 0 : Math.max(0, items.findIndex((o) => o.selected)); hl();
+    };
+    const place = () => {
+      const r = inp.getBoundingClientRect(), below = innerHeight - r.bottom - 8, above = r.top - 8, up = below < 220 && above > below;
+      Object.assign(list.style, { left: r.left + "px", minWidth: r.width + "px", maxWidth: Math.max(r.width, Math.min(520, innerWidth - r.left - 8)) + "px",
+        maxHeight: Math.max(120, Math.min(340, up ? above : below)) + "px", top: up ? "" : r.bottom + 2 + "px", bottom: up ? innerHeight - r.top + 2 + "px" : "" });
+    };
+    const open = () => {
+      if (OPEN && OPEN !== api) OPEN.close();
+      OPEN = api; openedAt = Date.now(); list.hidden = false; inp.setAttribute("aria-expanded", "true"); build(""); place(); inp.select();
+    };
+    const close = () => {
+      list.hidden = true; inp.setAttribute("aria-expanded", "false"); inp.removeAttribute("aria-activedescendant");
+      if (OPEN === api) OPEN = null; show();
+    };
+    const pick = (o) => {
+      const changed = !!o && !o.selected;
+      if (o) VAL.set.call(sel, o.value);
+      close();
+      if (changed) sel.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    const api = { close, place };
+
+    inp.addEventListener("focus", open);
+    // klik membuka daftar; klik pertama tetap memilih seluruh teks agar bisa langsung diketik
+    inp.addEventListener("click", () => { if (list.hidden) open(); else if (Date.now() - openedAt < 400) inp.select(); });
+    inp.addEventListener("input", () => { if (list.hidden) { list.hidden = false; inp.setAttribute("aria-expanded", "true"); OPEN = api; } build(inp.value); place(); });
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        if (list.hidden) open(); else { act = Math.min(items.length - 1, Math.max(0, act + (e.key === "ArrowDown" ? 1 : -1))); hl(); }
+      } else if (e.key === "Enter") { if (!list.hidden) { e.preventDefault(); pick(items[act]); } }
+      else if (e.key === "Escape") { if (!list.hidden) { e.preventDefault(); e.stopPropagation(); close(); inp.select(); } }
+      else if (e.key === "Tab") { if (!list.hidden) close(); }
+    });
+    inp.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== inp && !list.hidden) close(); }, 120));
+    list.addEventListener("mousedown", (e) => e.preventDefault());
+    list.addEventListener("click", (e) => { const li = e.target.closest("li[data-i]"); if (li) pick(items[+li.dataset.i]); });
+
+    // nilai yang diubah lewat kode (sel.value = …, innerHTML opsi baru) ikut tampil di kotak isian
+    Object.defineProperty(sel, "value", { configurable: true, get() { return VAL.get.call(this); }, set(v) { VAL.set.call(this, v); show(); } });
+    Object.defineProperty(sel, "selectedIndex", { configurable: true, get() { return IDX.get.call(this); }, set(v) { IDX.set.call(this, v); show(); } });
+    new MutationObserver(() => { show(); if (!list.hidden) { build(inp.value === label() ? "" : inp.value); place(); } })
+      .observe(sel, { childList: true, subtree: true, attributes: true, characterData: true });
+    sel.addEventListener("change", show);
+    sel._combo = api; show();
+  }
+
+  const scan = (n) => { if (n.nodeType !== 1) return; if (n.tagName === "SELECT") enhance(n); else n.querySelectorAll("select").forEach(enhance); };
+  new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach(scan))).observe(document.documentElement, { childList: true, subtree: true });
+  addEventListener("scroll", (e) => { if (OPEN && !(e.target instanceof Element && e.target.closest(".combo-list"))) OPEN.place(); }, true);
+  addEventListener("resize", () => OPEN && OPEN.place());
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => scan(document.body)); else scan(document.body);
+})();
+</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signInWithCredential, onAuthStateChanged, signOut, connectAuthEmulator } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
