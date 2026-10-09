@@ -492,7 +492,7 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
     $("#daftarNote").textContent = ME.role === "D302"
       ? "D302 dapat meninjau usulan pada tab Usulan Perubahan, dan dapat mengusulkan perubahan untuk Perwakilan yang dipilih. Kolom Perubahan menandai lokasi hasil usulan yang disetujui."
       : "Ganti, hapus, atau tambah lokasi diajukan sebagai usulan dan baru berlaku setelah disetujui D302. Pilihan KDKMP pengganti/tambahan diambil dari populasi BNBA wilayah kerja Perwakilan.";
-    if (!started) { show("ring"); started = true; }
+    if (!started) { show(location.hash === "#usulan" ? "usul" : "ring"); started = true; }   // tautan email notifikasi: …/#usulan
     refresh();
   }
   function refresh() {
