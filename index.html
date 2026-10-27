@@ -477,6 +477,9 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
     return l;
   }
   const kodeTerkunci = (code) => { const m = new Map(); for (const s of pending(code)) { if (s.lama) m.set(s.lama.kode, s); if (s.baru) m.set(s.baru.kode, s); } return m; };
+  // Ajukan perubahan atas lokasi efektif, bukan mengedit dokumen persetujuan lama.
+  const lokasiDisetujui = (s) => s.status === "disetujui" && s.baru
+    ? (EFF.lists.get(s.pw) || []).find((x) => x.kode === s.baru.kode && x.usulId === s.id) : null;
 
   // ---------------- tampilan ----------------
   function start() {
@@ -491,7 +494,7 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
     $("#uSt").value = ME.role === "D302" ? "diajukan" : "";
     $("#daftarNote").textContent = ME.role === "D302"
       ? "D302 dapat meninjau usulan pada tab Usulan Perubahan, dan dapat mengusulkan perubahan untuk Perwakilan yang dipilih. Kolom Perubahan menandai lokasi hasil usulan yang disetujui."
-      : "Ganti, hapus, atau tambah lokasi diajukan sebagai usulan dan baru berlaku setelah disetujui D302. Pilihan KDKMP pengganti/tambahan diambil dari populasi BNBA wilayah kerja Perwakilan.";
+      : "Pilihan yang sudah disetujui tetap dapat diubah: gunakan Ganti/Hapus di daftar ini atau Usulkan perubahan lagi pada tab Usulan Perubahan. Perubahan diajukan sebagai usulan baru; pilihan saat ini tetap berlaku sampai disetujui D302. Pilihan pengganti/tambahan bersumber dari populasi BNBA wilayah kerja Perwakilan.";
     if (!started) { show(location.hash === "#usulan" ? "usul" : "ring"); started = true; }   // tautan email notifikasi: …/#usulan
     refresh();
   }
@@ -590,6 +593,12 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
         let aksi = "";
         if (s.status === "diajukan" && ME.role === "D302") aksi = `<button class="mini" data-uact="tinjau" data-id="${s.id}">Tinjau</button>`;
         else if (s.status === "diajukan" && ME.pw === s.pw) aksi = `<button class="mini r" data-uact="batal" data-id="${s.id}">Batalkan</button>`;
+        else if (s.status === "disetujui" && canPropose(s.pw)) {
+          const lokasi = lokasiDisetujui(s);
+          const terkunci = lokasi && kodeTerkunci(s.pw).has(lokasi.kode);
+          if (lokasi) aksi = `<button class="mini" data-uact="ubah-lagi" data-id="${s.id}" ${terkunci ? "disabled" : ""}>Usulkan perubahan lagi</button><div class="sub" style="margin-top:4px">${terkunci ? "Ada usulan untuk lokasi ini yang masih menunggu persetujuan." : "Perubahan baru perlu persetujuan D302; pilihan saat ini tetap berlaku."}</div>`;
+          else aksi = `<span class="sub">${s.jenis === "hapus" ? "Untuk memilih lokasi baru, gunakan Tambah lokasi pada tab Daftar Lokasi." : "Lokasi hasil persetujuan ini tidak lagi aktif. Gunakan tab Daftar Lokasi untuk mengubah pilihan terkini."}</span>`;
+        }
         const g = EFF.gagal.get(s.id);
         const stc = `<span class="st st-${s.status}">${STATUS[s.status] || esc(s.status)}</span>` +
           (s.ditinjau_pada ? `<div class="sub" style="margin-top:3px">${esc(s.ditinjau_nama || s.ditinjau_oleh)}<br>${tgl(s.ditinjau_pada)}</div>` : "") +
@@ -601,9 +610,13 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
   ["#uSt", "#uPw"].forEach((s) => $(s).addEventListener("change", renderUsul));
   $("#uQ").addEventListener("input", renderUsul);
   $("#tblUsul").addEventListener("click", (ev) => {
-    const b = ev.target.closest("button[data-uact]"); if (!b) return;
+    const b = ev.target.closest("button[data-uact]"); if (!b || b.disabled) return;
     const s = USUL.find((x) => x.id === b.dataset.id); if (!s) return;
-    if (b.dataset.uact === "tinjau") openTinjau(s); else openBatal(s);
+    if (b.dataset.uact === "ubah-lagi") {
+      const lokasi = lokasiDisetujui(s);
+      if (!canPropose(s.pw) || !lokasi || kodeTerkunci(s.pw).has(lokasi.kode)) return;
+      openPicker(s.pw, lokasi);
+    } else if (b.dataset.uact === "tinjau") openTinjau(s); else openBatal(s);
   });
 
   // ---------------- dialog ----------------
