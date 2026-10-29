@@ -487,7 +487,7 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
     $("#meta").textContent = `${DATA.pw_nama ? DATA.pw_nama + " · " : "Lokus per Perwakilan BPKP · "}maksimal 10 lokasi per Perwakilan · data portal ${DATA.generated}`;
     $("#foot").textContent = `Sumber: ${DATA.sumber}. Usulan perubahan lokasi bersumber dari populasi BNBA KDKMP per wilayah kerja Perwakilan. Disusun untuk pengawasan pembangunan gedung KDKMP Triwulan IV 2026.`;
     const R = DATA.ringkasan;
-    $("#fPw").innerHTML = (R.length > 1 ? `<option value="">Semua Perwakilan (${R.length})</option>` : "") + R.map((r) => `<option value="${esc(r.pw)}">${r.no}. ${esc(short(r.pw))} — ${esc(title(r.kab))}</option>`).join("");
+    $("#fPw").innerHTML = (R.length > 1 ? `<option value="">Semua Perwakilan (${R.length})</option>` : "") + R.map((r) => `<option value="${esc(r.pw)}">${r.no}. ${esc(short(r.pw))}</option>`).join("");
     $("#fKat").innerHTML = `<option value="">Semua kategori</option>` + KATS.map(([v, , l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
     $("#uPw").innerHTML = `<option value="">Semua Perwakilan</option>` + R.map((r) => `<option value="${pwCode(r.pw)}">${r.no}. ${esc(short(r.pw))}</option>`).join("");
     $("#uPwWrap").classList.toggle("hidden", ME.role !== "D302");
@@ -516,10 +516,11 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
     $("#tblRing").innerHTML = `<thead><tr><th class="num">No</th><th>Perwakilan</th><th>Lokasi kantor</th><th>Kab/Kota lokasi uji petik</th><th>Dasar pemilihan</th><th class="num">(4) Ops</th><th class="num">(2) Mandek</th><th class="num">(1) Bangun</th><th class="num">(3) Lahan</th><th class="num">Jml</th><th class="num">Usulan<br>menunggu</th></tr></thead><tbody>` +
       DATA.ringkasan.map((r) => {
         const code = pwCode(r.pw), lst = EFF.lists.get(code) || [], k = komposisi(lst), np = pending(code).length;
-        // kab/kota lokus di depan, kab/kota lain dari daftar lokasi efektif (abu-abu)
-        const lain = [...new Set(lst.map((x) => x.kab))].filter((kb) => kb !== r.kab);
-        const kabCell = `<span class="dot" style="color:${tierColor(r.dasar)}">●</span> ${esc(title(r.kab))}` +
-          (lain.length ? `<span class="sub">, ${lain.map((kb) => esc(title(kb))).join(", ")}</span>` : "");
+        // Hanya kab/kota yang masih memiliki lokasi dalam daftar efektif setelah persetujuan.
+        const kab = [...new Set(lst.map((x) => x.kab).filter(Boolean))];
+        const kabCell = kab.length
+          ? `<span class="dot" style="color:${tierColor(r.dasar)}">●</span> ${kab.map((kb) => esc(title(kb))).join(", ")}`
+          : `<span class="z">–</span>`;
         return `<tr class="click" data-pw="${esc(r.pw)}"><td class="no">${r.no}</td><td>${esc(short(r.pw))}</td><td>${esc(r.kantor)}</td><td style="min-width:170px;max-width:260px">${kabCell}</td><td style="max-width:360px">${esc(r.dasar)}</td>${cell(k.k4, "b4")}${cell(k.k2, "b2")}${cell(k.k1)}${cell(k.k3)}<td class="num"><b>${fmt(k.n)}</b></td>${np ? `<td class="num"><span class="st st-diajukan">${np}</span></td>` : `<td class="num z">–</td>`}</tr>`;
       }).join("") + `</tbody>`;
   }
