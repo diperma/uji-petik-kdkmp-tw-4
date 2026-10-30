@@ -197,7 +197,7 @@ input.combo-in:focus{cursor:text;outline:2px solid var(--blue);outline-offset:0;
       </div>
       <div class="tablewrap"><table id="tblRing"></table></div>
       <p class="note">Klik baris untuk membuka daftar lokasi Perwakilan tersebut. Angka lokasi sudah memperhitungkan usulan perubahan yang disetujui D302. Kolom: (4) Ops = sudah beroperasi, (2) Mandek = belum terbangun mandek &gt; 3 bulan, (1) Bangun = terbangun dengan kelengkapan, (3) Lahan = belum memiliki lahan.
-      Maksimal 10 lokasi per Perwakilan; KDKMP belum memiliki lahan maksimal 3. Wilayah tanpa KDKMP beroperasi: 4 mandek, 3 terbangun dengan kelengkapan, 3 belum memiliki lahan. Wilayah dengan KDKMP beroperasi: beroperasi didahulukan (seluruh 84 titik prioritas yang belum pernah diuji petik BPKP, minimal 3), lalu 3 mandek, 2 terbangun, 2 belum lahan; Jawa Tengah, DIY, dan Jawa Timur tetap 10 KDKMP beroperasi. Bila kategori di kab/kota lokus kurang, diisi mandek dari kab/kota lain di wilayah kerja yang sama. KDKMP sampel TW II/TW III tidak diambil ulang. Wilayah kerja sesuai Peraturan BPKP Nomor 5 Tahun 2026.</p>
+      Maksimal 10 lokasi per Perwakilan; KDKMP belum memiliki lahan maksimal 3, kecuali Perwakilan Maluku, Maluku Utara, dan seluruh wilayah Papua yang tidak dibatasi jumlah kategori belum memiliki lahan (total tetap maksimal 10 lokasi). Komposisi awal wilayah tanpa KDKMP beroperasi: 4 mandek, 3 terbangun dengan kelengkapan, 3 belum memiliki lahan. Wilayah dengan KDKMP beroperasi: beroperasi didahulukan (seluruh 84 titik prioritas yang belum pernah diuji petik BPKP, minimal 3), lalu 3 mandek, 2 terbangun, 2 belum lahan; Jawa Tengah, DIY, dan Jawa Timur tetap 10 KDKMP beroperasi. Bila kategori di kab/kota lokus kurang, diisi mandek dari kab/kota lain di wilayah kerja yang sama. KDKMP sampel TW II/TW III tidak diambil ulang. Wilayah kerja sesuai Peraturan BPKP Nomor 5 Tahun 2026.</p>
     </section>
 
     <section id="v-daftar" role="tabpanel" aria-labelledby="t-daftar" class="hidden">
@@ -223,7 +223,7 @@ input.combo-in:focus{cursor:text;outline:2px solid var(--blue);outline-offset:0;
       </div>
       <div class="count" id="uCount"></div>
       <div class="tablewrap"><table id="tblUsul"></table></div>
-      <p class="note">Alur: Perwakilan mengusulkan penggantian, penghapusan, atau penambahan lokasi dengan KDKMP dari populasi BNBA wilayah kerjanya → D302 meninjau → usulan yang disetujui langsung mengubah daftar lokasi. Batas tetap berlaku saat pengajuan dan persetujuan: maksimal 10 lokasi per Perwakilan dan maksimal 3 KDKMP belum memiliki lahan. Usulan tidak dapat dihapus; usulan yang masih menunggu dapat dibatalkan oleh Perwakilan pengusul.</p>
+      <p class="note">Alur: Perwakilan mengusulkan penggantian, penghapusan, atau penambahan lokasi dengan KDKMP dari populasi BNBA wilayah kerjanya → D302 meninjau → usulan yang disetujui langsung mengubah daftar lokasi. Batas tetap berlaku saat pengajuan dan persetujuan: maksimal 10 lokasi per Perwakilan dan maksimal 3 KDKMP belum memiliki lahan. Khusus Perwakilan Maluku, Maluku Utara, dan seluruh wilayah Papua, batas 3 KDKMP belum memiliki lahan tidak berlaku; total tetap maksimal 10 lokasi. Usulan tidak dapat dihapus; usulan yang masih menunggu dapat dibatalkan oleh Perwakilan pengusul.</p>
     </section>
   </main>
   <footer id="foot"></footer>
@@ -433,10 +433,11 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
     for (const x of list) c["k" + x.kat[1]]++;
     return c;
   }
-  function batasErr(list) {
+  const tanpaBatasLahan = (code) => /^(?:Perwakilan BPKP )?(?:Maluku(?: Utara)?|Papua(?: .+)?)$/.test(pwName(code));
+  function batasErr(list, code) {
     const c = komposisi(list);
     if (c.n > MAXN) return `jumlah lokasi menjadi ${c.n}, melebihi batas ${MAXN} per Perwakilan`;
-    if (c.k3 > MAX_LAHAN) return `KDKMP belum memiliki lahan menjadi ${c.k3}, melebihi batas ${MAX_LAHAN}`;
+    if (!tanpaBatasLahan(code) && c.k3 > MAX_LAHAN) return `KDKMP belum memiliki lahan menjadi ${c.k3}, melebihi batas ${MAX_LAHAN}`;
     return "";
   }
   function applyOne(list, s) {
@@ -448,7 +449,7 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
     if (s.jenis === "hapus") next.splice(idx, 1);
     else if (s.jenis === "ganti") next[idx] = nb;
     else next.push(nb);
-    const e = batasErr(next);
+    const e = batasErr(next, s.pw);
     return e ? { err: e } : { list: next };
   }
   function compute() {
@@ -541,7 +542,7 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
       const now = komposisi(EFF.lists.get(code) || []), pj = komposisi(proyeksi(code)), np = pending(code).length;
       const full = pj.n >= MAXN;
       $("#komp").innerHTML = `<b>${esc(short(selPw))}</b><span class="sep"></span>
-        <span class="chip ${now.n >= MAXN ? "full" : ""}">${now.n}/${MAXN} lokasi</span><span class="chip">(4) ${now.k4}</span><span class="chip">(2) ${now.k2}</span><span class="chip">(1) ${now.k1}</span><span class="chip ${now.k3 >= MAX_LAHAN ? "full" : ""}">(3) ${now.k3}/${MAX_LAHAN}</span>
+        <span class="chip ${now.n >= MAXN ? "full" : ""}">${now.n}/${MAXN} lokasi</span><span class="chip">(4) ${now.k4}</span><span class="chip">(2) ${now.k2}</span><span class="chip">(1) ${now.k1}</span><span class="chip ${!tanpaBatasLahan(code) && now.k3 >= MAX_LAHAN ? "full" : ""}">(3) ${now.k3}${tanpaBatasLahan(code) ? " · tanpa batas kategori" : "/" + MAX_LAHAN}</span>
         ${np ? `<span class="sep"></span><span class="sub">${np} usulan menunggu · jika disetujui: ${pj.n} lokasi, (3) ${pj.k3}</span>` : ""}
         <span class="grow"></span><button class="btn btn-navy" id="btnTambah" type="button" ${full ? "disabled" : ""} title="${full ? "Daftar (termasuk usulan menunggu) sudah 10 lokasi; usulkan ganti atau hapus" : ""}">+ Usulkan tambah lokasi</button>`;
       $("#komp").classList.remove("hidden");
