@@ -368,7 +368,119 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
   const MAXN = 10, MAX_LAHAN = 3;
 
   let DATA = null, ME = null, USUL = [], EFF = null, unsub = null, started = false;
+// VERSIONED_READER_BEGIN
+// Kept inline in both preview pages: deployable without an extra script dependency.
+function createSnapshotReader(read, alive = () => true) {
+  const pins = new Map(), cache = new Map();
+  let closed = false;
+  const check = () => { if (closed || !alive()) throw new Error("Sesi data telah berakhir."); };
+  const get = async (col, id) => { check(); const value = await read(col, id); check(); return value; };
+  const parse = (doc) => {
+    if (!doc || typeof doc.json !== "string") throw new Error("Manifest tidak valid.");
+    const man = JSON.parse(doc.json);
+    if (!man || !man.datasets || typeof man.datasets !== "object" || Array.isArray(man.datasets)) throw new Error("Dataset manifest tidak valid.");
+    return man;
+  };
+  const pin = (col, pre) => {
+    check();
+    const scope = JSON.stringify([col, pre]);
+    if (!pins.has(scope)) pins.set(scope, (async () => {
+      const pointer = await get(col, pre + "active");
+      if (pointer === null) {
+        const man = parse(await get(col, pre + "manifest"));
+        if (man.schema_version === 2) throw new Error("Manifest versi 2 memerlukan pointer active.");
+        return { col, pre, man, version: "legacy", legacy: true };
+      }
+      if (pointer.schema_version !== 2 || typeof pointer.snapshot_id !== "string" || !/^[A-Za-z0-9_-]{1,160}$/.test(pointer.snapshot_id)) throw new Error("Pointer snapshot tidak valid.");
+      const version = pointer.snapshot_id;
+      const man = parse(await get(col, pre + "v_" + version + "_manifest"));
+      if (man.schema_version !== 2 || man.snapshot_id !== version) throw new Error("Versi manifest tidak cocok dengan pointer.");
+      return { col, pre, man, version, legacy: false };
+    })());
+    return pins.get(scope);
+  };
+  const unpack = async (b64) => {
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    return JSON.parse(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).text());
+  };
+  const validate = (data, spec) => {
+    if (!data || !Array.isArray(data.cols) || !data.cols.every(c => typeof c === "string") || !Array.isArray(data.rows) || data.rows.length !== spec.rows || !data.rows.every(r => Array.isArray(r) && r.length === data.cols.length)) throw new Error("Jumlah baris/kolom dataset tidak cocok.");
+    if (Array.isArray(spec.cols) ? JSON.stringify(data.cols) !== JSON.stringify(spec.cols) : data.cols.length !== spec.cols) throw new Error("Kolom dataset tidak cocok.");
+    return data;
+  };
+  const dataset = async (col, pre, name) => {
+    const p = await pin(col, pre); check();
+    const key = JSON.stringify([col, pre, p.version, name]);
+    if (!cache.has(key)) cache.set(key, (async () => {
+      const spec = p.man.datasets[name];
+      if (!spec || !Number.isSafeInteger(spec.chunks) || spec.chunks < 1 || !Number.isSafeInteger(spec.rows) || spec.rows < 0 || !(Array.isArray(spec.cols) || (Number.isSafeInteger(spec.cols) && spec.cols >= 0))) throw new Error("Spesifikasi dataset tidak valid: " + name);
+      if (!p.legacy && (!Array.isArray(spec.chunk_sha256) || spec.chunk_sha256.length !== spec.chunks || !spec.chunk_sha256.every(h => typeof h === "string" && /^[a-f0-9]{64}$/i.test(h)))) throw new Error("Hash chunk tidak valid.");
+      const parts = await Promise.all(Array.from({ length: spec.chunks }, async (_, i) => {
+        const id = pre + (p.legacy ? "" : "v_" + p.version + "_") + name + "_" + i;
+        const chunk = await get(col, id);
+        if (!chunk || typeof chunk.d !== "string" || !chunk.d.length) throw new Error("Chunk tidak tersedia: " + id);
+        if (!p.legacy) {
+          // Hash covers the exact UTF-8 base64 fragment stored in Firestore.
+          const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(chunk.d))), b => b.toString(16).padStart(2, "0")).join("");
+          check();
+          if (hash !== spec.chunk_sha256[i].toLowerCase()) throw new Error("Integritas chunk gagal: " + id);
+        }
+        return chunk.d;
+      }));
+      let data;
+      if (p.legacy && col === "populasi_pw") {
+        // Old PW publisher compressed each row partition separately.
+        const blocks = await Promise.all(parts.map(unpack));
+        const cols = blocks[0].cols;
+        if (!blocks.every(b => Array.isArray(b.rows) && JSON.stringify(b.cols) === JSON.stringify(cols))) throw new Error("Kolom chunk legacy tidak cocok.");
+        data = { ...blocks[0], rows: blocks.flatMap(b => b.rows) };
+      } else data = await unpack(parts.join(""));
+      check(); return validate(data, spec);
+    })());
+    const result = await cache.get(key); check(); return result;
+  };
+  return { pin, dataset, clear() { closed = true; pins.clear(); cache.clear(); } };
+}
+function readerK1Label(man) {
+  return man?.schema_version === 2 ? "(1) Bukti sarpras lama (parsial)" : "(1) Terbangun dengan kelengkapan";
+}
+function readerCoverageText(man) {
+  if (man?.schema_version !== 2) return "";
+  const k = man.kpi || {}, number = v => Number.isSafeInteger(v) && v >= 0;
+  const parts = [];
+  const unknown = k.sarpras_unknown_completed ?? k.unknown_completed;
+  if (number(unknown)) parts.push("Gedung selesai dengan sarpras belum diketahui: " + unknown.toLocaleString("id-ID"));
+  if (number(k.lahan)) parts.push("Gerai dalam kandidat (termasuk retensi): " + k.lahan.toLocaleString("id-ID"));
+  if (number(k.stale_gerai)) parts.push("Gerai lama dipertahankan (stale): " + k.stale_gerai.toLocaleString("id-ID"));
+  if (number(k.lahan) && number(k.stale_gerai) && k.stale_gerai <= k.lahan) parts.push("Gerai pada sumber portal terbaru: " + (k.lahan - k.stale_gerai).toLocaleString("id-ID") + " (kandidat dikurangi retensi; bukan bukti kelengkapan nasional)");
+  return parts.join(" · ");
+}
+function snapshotSourceText(man) {
+  const dates = man.source_dates || {};
+  const dateText = Object.entries(dates).map(([k, v]) => k + ": " + (typeof v === "object" ? JSON.stringify(v) : v)).join(" · ");
+  const warnings = Array.isArray(man.warnings) ? man.warnings.map(w => typeof w === "string" ? w : JSON.stringify(w)).join(" · ") : (man.warnings ? String(man.warnings) : "");
+  return (dateText ? "Tanggal sumber — " + dateText : "Tanggal sumber belum tersedia (data legacy).") + " · Sarpras menggunakan sumber lama/parsial; nilai tidak diketahui bukan nol atau bukti lengkap. Perlu verifikasi lapangan." + (warnings ? " · " + warnings : "") + (readerCoverageText(man) ? " · " + readerCoverageText(man) : "");
+}
+// Latest progress may legitimately be zero or unknown; only legacy snapshots use the historic column.
+function readerProgress(row, legacy) {
+  return row["Progres terbaru (%)"] ?? (legacy ? row["Progres 6 Okt (%)"] : null) ?? null;
+}
+function readerEvidenceNumber(value, format = String) {
+  return value == null || value === "" ? "belum diketahui" : format(value);
+}
+// VERSIONED_READER_END
+
   const KAND = {};
+  let READER = null, SESSION = 0;
+  function resetReader() {
+    SESSION++; if (READER) READER.clear(); READER = null;
+    for (const key in KAND) delete KAND[key];
+    DATA = null; ME = null; USUL = []; EFF = null; PICK = null;
+    if (dlg.open) dlg.close();
+    $("#app").classList.add("hidden"); $("#login").classList.remove("hidden");
+    $("#who").textContent = "";
+  }
+
 
   $("#loginBtn").addEventListener("click", async () => {
     setErr(""); busy(true, "Membuka login Google…");
@@ -379,31 +491,37 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
       busy(false);
     }
   });
-  $("#logout").addEventListener("click", () => signOut(auth));
+  $("#logout").addEventListener("click", () => { resetReader(); if (unsub) { unsub(); unsub = null; } return signOut(auth); });
 
   onAuthStateChanged(auth, async (u) => {
     if (unsub) { unsub(); unsub = null; }
-    if (!u) { DATA = null; ME = null; USUL = []; $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); busy(false); return; }
+    resetReader(); const session = SESSION;
+    const current = () => session === SESSION && auth.currentUser === u;
+    if (!u) { busy(false); return; }
     if (!isBpkp(u)) { setErr(`Akun ${u.email || ""} bukan akun BPKP. Gunakan akun @bpkp.go.id.`); await signOut(auth); return; }
     busy(true, "Memuat data…");
     try {
       const ak = await getDoc(doc(db, "akses", u.email.toLowerCase()));
+      if (!current()) return;
       if (!ak.exists()) { setErr(`Akun ${u.email} belum terdaftar untuk aplikasi ini. Akses diberikan kepada pegawai D302 dan pegawai Perwakilan BPKP sesuai daftar pegawai; hubungi Tim APP KDKMP (D302) bila perlu akses.`); await signOut(auth); return; }
       const A = ak.data();
       ME = { email: u.email.toLowerCase(), role: A.role, pw: A.pw, nama: A.nama || "", unit: A.unit || "" };
       const snap = await getDoc(doc(db, "lokus_tw4", ME.role === "D302" ? "data" : "pw_" + ME.pw));
+      if (!current()) return;
       if (!snap.exists()) throw new Error("Data belum tersedia.");
       DATA = JSON.parse(snap.data().json);
       DATA.unit = ME.role === "D302" ? "D302 · semua Perwakilan" : ME.unit;
       $("#who").textContent = `${u.email} · ${DATA.unit}`;
+      READER = createSnapshotReader(async (col, id) => { const s = await getDoc(doc(db, col, id)); return s.exists() ? s.data() : null; }, current);
       USUL = []; start();
       const q = ME.role === "D302" ? collection(db, "usulan_tw4") : query(collection(db, "usulan_tw4"), where("pw", "==", ME.pw));
-      unsub = onSnapshot(q, (s) => { USUL = s.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) })); refresh(); },
-        (e) => toast("Gagal memuat usulan: " + (e.code || e.message), true));
+      unsub = onSnapshot(q, (s) => { if (!current()) return; USUL = s.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) })); refresh(); },
+        (e) => { if (current()) toast("Gagal memuat usulan: " + (e.code || e.message), true); });
     } catch (e) {
+      if (!current()) return;
       setErr(e && e.code === "permission-denied" ? "Akses ditolak. Pastikan memakai akun @bpkp.go.id." : "Gagal memuat data: " + (e.message || e));
       await signOut(auth);
-    } finally { busy(false); }
+    } finally { if (current()) busy(false); }
   });
 
   const KATS = [
@@ -485,7 +603,7 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
   // ---------------- tampilan ----------------
   function start() {
     $("#login").classList.add("hidden"); $("#app").classList.remove("hidden");
-    $("#meta").textContent = `${DATA.pw_nama ? DATA.pw_nama + " · " : "Lokus per Perwakilan BPKP · "}maksimal 10 lokasi per Perwakilan · data portal ${DATA.generated}`;
+    $("#meta").textContent = `${DATA.pw_nama ? DATA.pw_nama + " · " : "Lokus per Perwakilan BPKP · "}maksimal 10 lokasi per Perwakilan · sumber lokus historis ${DATA.generated} (bukan tanggal pembaruan populasi)`;
     $("#foot").textContent = `Sumber: ${DATA.sumber}. Usulan perubahan lokasi bersumber dari populasi BNBA KDKMP per wilayah kerja Perwakilan. Disusun untuk pengawasan pembangunan gedung KDKMP Triwulan IV 2026.`;
     const R = DATA.ringkasan;
     $("#fPw").innerHTML = (R.length > 1 ? `<option value="">Semua Perwakilan (${R.length})</option>` : "") + R.map((r) => `<option value="${esc(r.pw)}">${r.no}. ${esc(short(r.pw))}</option>`).join("");
@@ -656,23 +774,22 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
   }
 
   // ---- ganti / tambah: pilih KDKMP dari populasi BNBA wilayah kerja
-  async function unpack(b64) {
-    const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    return JSON.parse(await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream("gzip"))).text());
-  }
   async function loadKand(code) {
-    if (KAND[code]) return KAND[code];
-    const m = await getDoc(doc(db, "populasi_pw", code + "_manifest"));
-    if (!m.exists()) throw new Error("Data populasi Perwakilan belum tersedia.");
-    const man = JSON.parse(m.data().json);
-    const ds = async (name) => {
-      const n = (man.datasets[name] || {}).chunks || 0; let cols = [], rows = [];
-      for (let i = 0; i < n; i++) { const s = await getDoc(doc(db, "populasi_pw", `${code}_${name}_${i}`)); const d = await unpack(s.data().d); cols = d.cols; rows = rows.concat(d.rows); }
-      return rows.map((r) => Object.fromEntries(cols.map((c, j) => [c, r[j]])));
+    const session = SESSION, reader = READER;
+    if (!reader) throw new Error("Sesi data telah berakhir.");
+    const pinned = await reader.pin("populasi_pw", code + "_");
+    if (session !== SESSION) throw new Error("Sesi data telah berakhir.");
+    const key = JSON.stringify([code, pinned.version]);
+    if (KAND[key]) { if ($("#kSource")) $("#kSource").textContent = snapshotSourceText(pinned.man); return KAND[key]; }
+    const ds = async name => {
+      const d = await reader.dataset("populasi_pw", code + "_", name);
+      return d.rows.map(r => Object.fromEntries(d.cols.map((c, j) => [c, r[j]])));
     };
     const [g, o, b] = await Promise.all(["gerai", "beroperasi", "belum_lahan"].map(ds));
+    if (session !== SESSION) throw new Error("Sesi data telah berakhir.");
+    if (PICK && PICK.code === code && $("#kSource")) $("#kSource").textContent = snapshotSourceText(pinned.man);
     const EXCL = new Set(["PAPUA SELATAN", "PAPUA PEGUNUNGAN"]);
-    const dec = (v) => Number(v || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+    const dec = (v) => Number(v).toLocaleString("id-ID", { maximumFractionDigits: 2 });
     const gk = new Map(g.map((r) => [r["Kode Desa"], r]));
     const out = new Map();
     const put = (x) => { if (!x.kode || EXCL.has(x.prov) || out.has(x.kode)) return; out.set(x.kode, x); };
@@ -687,19 +804,21 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
     }
     for (const r of g) {
       const base = { prov: r.Provinsi, kab: r["Kabupaten/Kota"], kec: r.Kecamatan, desa: r["Desa/Kelurahan"], kode: r["Kode Desa"], nik: r["NIK Koperasi (master)"], nama: r["Nama Koperasi (portal)"], lat: N(r.Latitude), lon: N(r.Longitude) };
-      if (r["(2) Mandek > 3 bulan"] === 1) put({ ...base, kat: KATS[2][0], alasan: `Progres ${dec(r["Progres 6 Okt (%)"])}%, lewat target ${fmt(r["Hari lewat target"])} hari (${r["Kategori keterlambatan"] || "-"})` });
-      else if (r["(1) Terbangun dengan kelengkapan"] === 1 && r["(4) Beroperasi"] !== 1) put({ ...base, kat: KATS[3][0], alasan: `Gedung 100%, sarpras ${fmt(r["Item sarpras tiba/terpasang"])} item tiba/terpasang (${r["Status kelengkapan sarpras"] || "-"}) — gali hambatan kelengkapan` });
+      if (r["(2) Mandek > 3 bulan"] === 1) put({ ...base, kat: KATS[2][0], alasan: `Progres ${readerEvidenceNumber(readerProgress(r, pinned.legacy), dec)}%, lewat target ${fmt(r["Hari lewat target"])} hari (${r["Kategori keterlambatan"] || "-"})` });
+      else if (r["(1) Terbangun dengan kelengkapan"] === 1 && r["(4) Beroperasi"] !== 1) put({ ...base, kat: KATS[3][0], alasan: `Gedung 100%, sarpras ${readerEvidenceNumber(r["Item sarpras tiba/terpasang"], fmt)} item tiba/terpasang (${r["Status kelengkapan sarpras"] || "-"}) — gali hambatan kelengkapan` });
     }
     for (const r of b) put({ prov: r.Provinsi, kab: r["Kabupaten/Kota"], kec: r.Kecamatan, desa: r["Desa/Kelurahan"], kode: r["Kode Desa"], nik: r["NIK Koperasi"], nama: r["Nama Koperasi"], lat: null, lon: null, kat: KATS[4][0], alasan: "Kode desa belum ada di data pemetaan lahan portal" });
     const ord = { 4: 0, 2: 1, 1: 2, 3: 3 };
-    KAND[code] = [...out.values()].sort((a, b) => ord[a.kat[1]] - ord[b.kat[1]] || String(a.kab).localeCompare(b.kab) || String(a.kec).localeCompare(b.kec) || String(a.desa).localeCompare(b.desa));
-    return KAND[code];
+    KAND[key] = [...out.values()].sort((a, b) => ord[a.kat[1]] - ord[b.kat[1]] || String(a.kab).localeCompare(b.kab) || String(a.kec).localeCompare(b.kec) || String(a.desa).localeCompare(b.desa));
+    return KAND[key];
   }
 
   let PICK = null;
   async function openPicker(code, lama) {
+    const session = SESSION;
     const jenis = lama ? "ganti" : "tambah";
     PICK = { code, lama, jenis, sel: null, list: null };
+    const pick = PICK;
     openDlg(`${lama ? "Usulkan ganti lokasi" : "Usulkan tambah lokasi"} · ${short(pwName(code))}`,
       `<div class="${lama ? "two" : ""}">${lama ? lokBox(lama, "Lokasi semula") : ""}<div class="box" id="kSel"><div class="h">KDKMP usulan</div><span class="sub">Pilih satu KDKMP dari tabel di bawah.</span></div></div>
        <div class="toolbar" style="margin-top:12px">
@@ -707,14 +826,15 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
          <div class="f"><label for="kKab">Kabupaten/Kota</label><select id="kKab"><option value="">Semua kab/kota</option></select></div>
          <div class="f"><label for="kQ">Cari (desa, kecamatan, nama, kode)</label><input id="kQ" type="search"></div>
        </div>
+       <p class="sub" id="kSource" style="font-size:12px" role="status"></p>
        <div class="count" id="kCount">Memuat populasi KDKMP wilayah kerja…</div>
        <div class="tablewrap" style="max-height:36vh"><table id="kTbl"></table></div>
        <label for="kAlasan">Alasan usulan (wajib, minimal 10 karakter)</label><textarea id="kAlasan" maxlength="1000" placeholder="mis. Lokasi semula sulit dijangkau; KDKMP pengganti satu kecamatan dengan lokasi lain sehingga efisien"></textarea>`,
       `<span class="msg" id="kMsg"></span><button class="btn btn-ghost" type="button" id="kBatal">Batal</button><button class="btn btn-navy" type="button" id="kKirim" disabled>Kirim usulan</button>`);
     $("#kBatal").addEventListener("click", closeDlg);
     let list;
-    try { list = await loadKand(code); } catch (e) { $("#kCount").textContent = "Gagal memuat populasi: " + (e.code || e.message); return; }
-    if (!PICK || PICK.code !== code || PICK.lama !== lama || !dlg.open) return;
+    try { list = await loadKand(code); } catch (e) { if (session === SESSION && PICK === pick && dlg.open) $("#kCount").textContent = "Gagal memuat populasi: " + (e.code || e.message); return; }
+    if (session !== SESSION || PICK !== pick || !dlg.open) return;
     PICK.list = list;
     $("#kKab").innerHTML += [...new Set(list.map((x) => x.kab))].sort().map((k) => `<option value="${esc(k)}">${esc(title(k))}</option>`).join("");
     if (lama) { $("#kKat").value = lama.kat.slice(0, 3); $("#kKab").value = [...$("#kKab").options].some((o) => o.value === lama.kab) ? lama.kab : ""; }
