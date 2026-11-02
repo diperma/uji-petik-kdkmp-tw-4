@@ -455,11 +455,20 @@ function readerCoverageText(man) {
   if (number(k.lahan) && number(k.stale_gerai) && k.stale_gerai <= k.lahan) parts.push("Gerai pada sumber portal terbaru: " + (k.lahan - k.stale_gerai).toLocaleString("id-ID") + " (kandidat dikurangi retensi; bukan bukti kelengkapan nasional)");
   return parts.join(" · ");
 }
+function snapshotUpdatedText(man) {
+  const raw = man?.source_dates?.portal_latest;
+  if (typeof raw !== "string") return "Terakhir diperbarui: belum tersedia";
+  const compact = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(?:\.(\d+))?Z$/.exec(raw);
+  const iso = compact ? `${compact[1]}-${compact[2]}-${compact[3]}T${compact[4]}:${compact[5]}:${compact[6]}.${(compact[7] || "0").slice(0, 3).padEnd(3, "0")}Z` : raw;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(iso)) return "Terakhir diperbarui: belum tersedia";
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "Terakhir diperbarui: belum tersedia";
+  const day = new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", day: "numeric", month: "long", year: "numeric" }).format(date);
+  const time = new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
+  return `Terakhir diperbarui: ${day}, ${time} WIB`;
+}
 function snapshotSourceText(man) {
-  const dates = man.source_dates || {};
-  const dateText = Object.entries(dates).map(([k, v]) => k + ": " + (typeof v === "object" ? JSON.stringify(v) : v)).join(" · ");
-  const warnings = Array.isArray(man.warnings) ? man.warnings.map(w => typeof w === "string" ? w : JSON.stringify(w)).join(" · ") : (man.warnings ? String(man.warnings) : "");
-  return (dateText ? "Tanggal sumber — " + dateText : "Tanggal sumber belum tersedia (data legacy).") + " · Sarpras menggunakan sumber lama/parsial; nilai tidak diketahui bukan nol atau bukti lengkap. Perlu verifikasi lapangan." + (warnings ? " · " + warnings : "") + (readerCoverageText(man) ? " · " + readerCoverageText(man) : "");
+  return snapshotUpdatedText(man) + ". Sarpras menggunakan data historis/parsial; data yang belum diketahui bukan berarti nol. Perlu verifikasi lapangan.";
 }
 // Latest progress may legitimately be zero or unknown; only legacy snapshots use the historic column.
 function readerProgress(row, legacy) {
@@ -514,6 +523,13 @@ function readerEvidenceNumber(value, format = String) {
       $("#who").textContent = `${u.email} · ${DATA.unit}`;
       READER = createSnapshotReader(async (col, id) => { const s = await getDoc(doc(db, col, id)); return s.exists() ? s.data() : null; }, current);
       USUL = []; start();
+      const metadataReader = READER;
+      const metadataScope = ME.role === "D302" ? ["populasi_tw4", ""] : ["populasi_pw", ME.pw + "_"];
+      metadataReader.pin(...metadataScope).then((pinned) => {
+        if (current() && READER === metadataReader) $("#meta").textContent = `${DATA.pw_nama || "Lokus per Perwakilan BPKP"} · ${snapshotUpdatedText(pinned.man)} (populasi kandidat)`;
+      }).catch(() => {
+        if (current() && READER === metadataReader) $("#meta").textContent = `${DATA.pw_nama || "Lokus per Perwakilan BPKP"} · Waktu pembaruan populasi belum dapat dimuat`;
+      });
       const q = ME.role === "D302" ? collection(db, "usulan_tw4") : query(collection(db, "usulan_tw4"), where("pw", "==", ME.pw));
       unsub = onSnapshot(q, (s) => { if (!current()) return; USUL = s.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) })); refresh(); },
         (e) => { if (current()) toast("Gagal memuat usulan: " + (e.code || e.message), true); });
@@ -603,8 +619,8 @@ function readerEvidenceNumber(value, format = String) {
   // ---------------- tampilan ----------------
   function start() {
     $("#login").classList.add("hidden"); $("#app").classList.remove("hidden");
-    $("#meta").textContent = `${DATA.pw_nama ? DATA.pw_nama + " · " : "Lokus per Perwakilan BPKP · "}maksimal 10 lokasi per Perwakilan · sumber lokus historis ${DATA.generated} (bukan tanggal pembaruan populasi)`;
-    $("#foot").textContent = `Sumber: ${DATA.sumber}. Usulan perubahan lokasi bersumber dari populasi BNBA KDKMP per wilayah kerja Perwakilan. Disusun untuk pengawasan pembangunan gedung KDKMP Triwulan IV 2026.`;
+    $("#meta").textContent = `${DATA.pw_nama || "Lokus per Perwakilan BPKP"} · Memuat waktu pembaruan populasi…`;
+    $("#foot").textContent = "Sumber kandidat: Portal KDKMP. Pembaruan populasi tidak mengubah lokus terpilih; perubahan lokus melalui persetujuan usulan.";
     const R = DATA.ringkasan;
     $("#fPw").innerHTML = (R.length > 1 ? `<option value="">Semua Perwakilan (${R.length})</option>` : "") + R.map((r) => `<option value="${esc(r.pw)}">${r.no}. ${esc(short(r.pw))}</option>`).join("");
     $("#fKat").innerHTML = `<option value="">Semua kategori</option>` + KATS.map(([v, , l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
