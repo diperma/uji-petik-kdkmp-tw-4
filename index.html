@@ -479,10 +479,86 @@ function readerEvidenceNumber(value, format = String) {
 }
 // VERSIONED_READER_END
 
+// CURRENT_CONDITION_BEGIN
+// Exact identifiers only: no name/fuzzy matching and no arbitrary duplicate selection.
+function currentConditionIndex(datasets) {
+  const nik = new Map(), kode = new Map();
+  const add = (map, key, row) => { if (key) { if (!map.has(key)) map.set(key, []); map.get(key).push(row); } };
+  for (const [kind, data] of Object.entries(datasets)) {
+    for (const values of data.rows) {
+      const row = Object.fromEntries(data.cols.map((col, i) => [col, values[i]]));
+      const entry = { kind, row, nik: currentConditionId(row['NIK Koperasi (master)'] ?? row['NIK Koperasi']), kode: currentConditionId(row['Kode Desa']) };
+      add(nik, entry.nik, entry); add(kode, entry.kode, entry);
+    }
+  }
+  return { nik, kode };
+}
+function currentConditionId(value) {
+  return value == null ? '' : String(value).trim();
+}
+function currentConditionMatch(index, lokus) {
+  const nik = currentConditionId(lokus.nik), kode = currentConditionId(lokus.kode);
+  const byNik = nik ? index.nik.get(nik) : null;
+  if (byNik?.length) return byNik.length === 1 ? byNik[0] : null;
+  const byKode = kode ? index.kode.get(kode) : null;
+  if (byKode?.length !== 1) return null;
+  const entry = byKode[0];
+  return nik && entry.nik && nik !== entry.nik ? null : entry;
+}
+function currentConditionText(lokus, state) {
+  if (!state || state.loading) return 'Memuat kondisi terbaru…';
+  const updated = snapshotUpdatedText(state.man);
+  if (state.error) return 'Kondisi terbaru belum dapat dimuat. ' + updated;
+  const entry = currentConditionMatch(state.index, lokus);
+  if (!entry) return 'Kondisi belum diketahui: tidak ditemukan padanan unik; bukan berarti belum memiliki lahan. ' + updated;
+  const r = entry.row;
+  if (r.stale === true) return 'Tidak ada dalam ekspor portal terbaru (retensi historis); kondisi saat ini belum diketahui. Sarpras historis/parsial, bukan bukti terkini. ' + updated;
+  if (entry.kind === 'belum_lahan') return 'Tercatat belum memiliki lahan pada dataset rekonstruksi; perlu verifikasi kondisi kini. Sarpras historis/parsial: belum diketahui. ' + updated;
+  const number = v => v !== null && v !== undefined && v !== '' && typeof v !== 'boolean' && Number.isFinite(Number(v));
+  const progress = r['Progres terbaru (%)'];
+  const status = r['Status pembangunan'];
+  const known = ['Selesai', 'Sedang dibangun', 'Belum melapor progres'].includes(status);
+  const parts = [known ? status : 'Status pembangunan belum diketahui', 'Progres portal: ' + (number(progress) ? Number(progress) + '%' : 'belum diketahui')];
+  if (r['(2) Mandek > 3 bulan'] === 1 || r['(2) Mandek > 3 bulan'] === true) {
+    const age = r['Hari sejak dibuat'], late = r['Hari lewat target'];
+    parts.push('Mandek > 3 bulan · sejak dibuat: ' + (number(age) ? Number(age) + ' hari' : 'belum diketahui') + ' · lewat target: ' + (number(late) ? Number(late) + ' hari' : 'belum diketahui'));
+  }
+  const items = r['Item sarpras tiba/terpasang'];
+  parts.push('Sarpras historis/parsial' + (r.sarpras_source_date ? ' (' + r.sarpras_source_date + ')' : '') + ': tiba/terpasang ' + (r.sarpras_unknown === true || !number(items) ? 'belum diketahui' : Number(items) + ' item'));
+  parts.push(updated);
+  return parts.join('. ');
+}
+// CURRENT_CONDITION_END
+
   const KAND = {};
+  let CONDITIONS = null;
   let READER = null, SESSION = 0;
+  function loadCurrentConditions() {
+    // One scope per session, independent of candidate eligibility and table renders.
+    if (CONDITIONS || !READER || !ME) return;
+    const session = SESSION, reader = READER;
+    const scope = ME.role === 'D302' ? ['populasi_tw4', ''] : ['populasi_pw', ME.pw + '_'];
+    const state = CONDITIONS = { loading: true, man: null };
+    const alive = () => session === SESSION && reader === READER && CONDITIONS === state;
+    (async () => {
+      try {
+        const pinned = await reader.pin(...scope);
+        if (!alive()) return;
+        state.man = pinned.man;
+        const [gerai, belum_lahan] = await Promise.all(['gerai', 'belum_lahan'].map(name => reader.dataset(...scope, name)));
+        if (!alive()) return;
+        state.index = currentConditionIndex({ gerai, belum_lahan });
+      } catch (_) {
+        if (!alive()) return;
+        state.error = true;
+      }
+      if (!alive()) return;
+      state.loading = false;
+      render();
+    })();
+  }
   function resetReader() {
-    SESSION++; if (READER) READER.clear(); READER = null;
+    SESSION++; if (READER) READER.clear(); READER = null; CONDITIONS = null;
     for (const key in KAND) delete KAND[key];
     DATA = null; ME = null; USUL = []; EFF = null; PICK = null;
     if (dlg.open) dlg.close();
@@ -522,7 +598,7 @@ function readerEvidenceNumber(value, format = String) {
       DATA.unit = ME.role === "D302" ? "D302 · semua Perwakilan" : ME.unit;
       $("#who").textContent = `${u.email} · ${DATA.unit}`;
       READER = createSnapshotReader(async (col, id) => { const s = await getDoc(doc(db, col, id)); return s.exists() ? s.data() : null; }, current);
-      USUL = []; start();
+      USUL = []; start(); loadCurrentConditions();
       const metadataReader = READER;
       const metadataScope = ME.role === "D302" ? ["populasi_tw4", ""] : ["populasi_pw", ME.pw + "_"];
       metadataReader.pin(...metadataScope).then((pinned) => {
@@ -684,13 +760,13 @@ function readerEvidenceNumber(value, format = String) {
     } else $("#komp").classList.add("hidden");
     const aksiOn = rows.some((x) => canPropose(pwCode(x.pw)));
     const lock = new Map(); for (const s of USUL) if (s.status === "diajukan" && s.lama) lock.set(s.lama.kode, s);
-    $("#tblDaftar").innerHTML = `<thead><tr><th class="num">No</th>${aksiOn ? "<th>Usulan</th>" : ""}<th>Perwakilan</th><th>Kab/Kota</th><th class="num">Urut</th><th>Kategori</th><th>Nama Koperasi</th><th>Kecamatan</th><th>Desa/Kelurahan</th><th>Kode Desa</th><th>NIK Koperasi</th><th>Alasan pemilihan</th><th>Peta</th><th>Perubahan</th></tr></thead><tbody>` +
+    $("#tblDaftar").innerHTML = `<thead><tr><th class="num">No</th>${aksiOn ? "<th>Usulan</th>" : ""}<th>Perwakilan</th><th>Kab/Kota</th><th class="num">Urut</th><th>Kategori</th><th>Nama Koperasi</th><th>Kecamatan</th><th>Desa/Kelurahan</th><th>Kode Desa</th><th>NIK Koperasi</th><th>Alasan pemilihan</th><th>Kondisi terbaru</th><th>Peta</th><th>Perubahan</th></tr></thead><tbody>` +
       rows.map((x) => {
         const map = (x.lat && x.lon) ? `<a href="https://www.google.com/maps?q=${encodeURIComponent(x.lat + "," + x.lon)}" target="_blank" rel="noopener">Buka</a>` : `<span class="z">–</span>`;
         const p = lock.get(x.kode), c = pwCode(x.pw), ket = ketPerubahan(x);
         const chg = [ket ? `<span class="st st-disetujui">${esc(ket)}</span>` : "", p ? `<span class="st st-diajukan">Usulan ${p.jenis === "hapus" ? "hapus" : "ganti"} menunggu</span>` : ""].filter(Boolean).join("<br>");
         const aksi = canPropose(c) ? `<button class="mini" data-act="ganti" data-pw="${c}" data-kode="${esc(x.kode)}" ${p ? "disabled" : ""}>Ganti</button> <button class="mini r" data-act="hapus" data-pw="${c}" data-kode="${esc(x.kode)}" ${p ? "disabled" : ""}>Hapus</button>` : "";
-        return `<tr><td class="num">${x.no}</td>${aksiOn ? `<td style="white-space:nowrap">${aksi}</td>` : ""}<td>${esc(short(x.pw))}</td><td style="min-width:110px">${esc(title(x.kab))}</td><td class="num">${x.urut}</td><td>${badge(x.kat)}</td><td style="min-width:220px">${esc(x.nama)}</td><td>${esc(x.kec)}</td><td>${esc(x.desa)}</td><td style="white-space:nowrap">${esc(x.kode)}</td><td>${esc(x.nik)}</td><td style="min-width:260px">${esc(x.alasan)}</td><td>${map}</td><td class="chg" style="min-width:150px">${chg || '<span class="z">–</span>'}</td></tr>`;
+        return `<tr><td class="num">${x.no}</td>${aksiOn ? `<td style="white-space:nowrap">${aksi}</td>` : ""}<td>${esc(short(x.pw))}</td><td style="min-width:110px">${esc(title(x.kab))}</td><td class="num">${x.urut}</td><td>${badge(x.kat)}</td><td style="min-width:220px">${esc(x.nama)}</td><td>${esc(x.kec)}</td><td>${esc(x.desa)}</td><td style="white-space:nowrap">${esc(x.kode)}</td><td>${esc(x.nik)}</td><td style="min-width:260px">${esc(x.alasan)}</td><td class="sub" style="min-width:260px;max-width:340px">${esc(currentConditionText(x, CONDITIONS))}</td><td>${map}</td><td class="chg" style="min-width:150px">${chg || '<span class="z">–</span>'}</td></tr>`;
       }).join("") + `</tbody>`;
   }
   $("#tblDaftar").addEventListener("click", (ev) => {
@@ -707,9 +783,9 @@ function readerEvidenceNumber(value, format = String) {
 
   $("#csv").addEventListener("click", () => {
     const cols = ["no", "pw", "prov", "kab", "urut", "kat", "kec", "desa", "kode", "nik", "nama", "alasan", "lat", "lon"];
-    const head = ["No", "Perwakilan", "Provinsi", "Kabupaten/Kota", "Urut", "Kategori", "Kecamatan", "Desa/Kelurahan", "Kode Desa", "NIK Koperasi", "Nama Koperasi", "Alasan pemilihan", "Latitude", "Longitude", "Perubahan"];
+    const head = ["No", "Perwakilan", "Provinsi", "Kabupaten/Kota", "Urut", "Kategori", "Kecamatan", "Desa/Kelurahan", "Kode Desa", "NIK Koperasi", "Nama Koperasi", "Alasan pemilihan", "Kondisi terbaru", "Latitude", "Longitude", "Perubahan"];
     const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const csv = "﻿" + [head.map(q).join(";")].concat(filtered().map((x) => cols.map((c) => q(x[c])).concat(q(ketPerubahan(x))).join(";"))).join("\r\n");
+    const csv = "﻿" + [head.map(q).join(";")].concat(filtered().map((x) => cols.flatMap((c) => c === "alasan" ? [q(x[c]), q(currentConditionText(x, CONDITIONS))] : [q(x[c])]).concat(q(ketPerubahan(x))).join(";"))).join("\r\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     a.download = "lokus_uji_petik_kdkmp_tw4_2026.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
