@@ -476,6 +476,16 @@ function readerEvidenceNumber(value, format = String) {
 // VERSIONED_READER_END
 
 // CURRENT_CONDITION_BEGIN
+const CURRENT_CONDITION_COLUMNS = ['kind', 'NIK Koperasi (master)', 'NIK Koperasi', 'Kode Desa', 'stale', 'Status pembangunan', 'Progres terbaru (%)', '(2) Mandek > 3 bulan', 'Hari sejak dibuat', 'Hari lewat target', 'Item sarpras tiba/terpasang', 'sarpras_unknown', 'sarpras_source_date'];
+function currentConditionProjection(data, spec) {
+  if (spec?.projection_version !== 1 || JSON.stringify(data.cols) !== JSON.stringify(CURRENT_CONDITION_COLUMNS)) throw new Error('Proyeksi kondisi tidak didukung.');
+  const grouped = Object.fromEntries(['gerai', 'belum_lahan', 'beroperasi'].map(kind => [kind, { cols: data.cols.slice(1), rows: [] }]));
+  for (const row of data.rows) {
+    if (typeof row[0] !== 'string' || !Object.hasOwn(grouped, row[0])) throw new Error('Jenis kondisi tidak valid.');
+    grouped[row[0]].rows.push(row.slice(1));
+  }
+  return grouped;
+}
 // Exact identifiers only: no name/fuzzy matching and no arbitrary duplicate selection.
 function currentConditionIndex(datasets) {
   const nik = new Map(), kode = new Map();
@@ -593,8 +603,21 @@ function currentComposition(list, state) {
         const pinned = await reader.pin(...scope);
         if (!alive()) return;
         state.man = pinned.man;
-        const [gerai, belum_lahan, beroperasi] = await Promise.all(['gerai', 'belum_lahan', 'beroperasi'].map(name => reader.dataset(...scope, name)));
+        let datasets;
+        // Load one compact projection for current evidence; only older manifests need full tables.
+        if (Object.hasOwn(pinned.man.datasets || {}, 'kondisi')) {
+          const spec = pinned.man.datasets.kondisi;
+          if (spec?.projection_version !== 1) throw new Error('Proyeksi kondisi tidak didukung.');
+          const compact = await reader.dataset(...scope, 'kondisi');
+          if (!alive()) return;
+          datasets = currentConditionProjection(compact, spec);
+        } else {
+          const names = ['gerai', 'belum_lahan', 'beroperasi'];
+          const tables = await Promise.all(names.map(name => reader.dataset(...scope, name)));
+          datasets = Object.fromEntries(names.map((name, i) => [name, tables[i]]));
+        }
         if (!alive()) return;
+        const { gerai, belum_lahan, beroperasi } = datasets;
         state.index = currentConditionIndex({ gerai, belum_lahan });
         state.operationIndex = currentConditionIndex({ beroperasi });
       } catch (_) {
