@@ -68,7 +68,7 @@ test('same derived plain text in table and CSV; loading/failure never fall back 
   assert.match(text(lokus, { error: true }), /belum dapat dimuat/);
   assert.match(html, /USUL = \[\]; start\(\); loadCurrentConditions\(\)/);
 });
-test('loader is cached per session, guarded, and reads all gerai + landless in authorized scope', async () => {
+test('loader is cached per session, guarded, and reads all gerai + landless + historical operation in authorized scope', async () => {
   const calls = [], deferred = [];
   const loaderContext = vm.createContext({
     currentConditionIndex: index,
@@ -81,13 +81,13 @@ test('loader is cached per session, guarded, and reads all gerai + landless in a
   assert.equal(deferred.length, 1);
   deferred.shift()({ man: {} });
   await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(calls.slice(0, 2).map(a => Array.from(a)), [['populasi_tw4', '', 'gerai'], ['populasi_tw4', '', 'belum_lahan']]);
+  assert.deepEqual(calls.slice(0, 3).map(a => Array.from(a)), [['populasi_tw4', '', 'gerai'], ['populasi_tw4', '', 'belum_lahan'], ['populasi_tw4', '', 'beroperasi']]);
   assert.equal(calls.at(-1), 'refresh');
   calls.length = 0;
   vm.runInContext('CONDITIONS = null; ME = { role: "PW", pw: "P10" }; loadCurrentConditions();', loaderContext);
   deferred.shift()({ man: {} });
   await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(Array.from(calls[0]), ['populasi_pw', 'P10_', 'gerai']);
+  assert.deepEqual(calls.slice(0, 3).map(a => Array.from(a)), [['populasi_pw', 'P10_', 'gerai'], ['populasi_pw', 'P10_', 'belum_lahan'], ['populasi_pw', 'P10_', 'beroperasi']]);
   calls.length = 0;
   vm.runInContext('CONDITIONS = null; loadCurrentConditions(); SESSION++;', loaderContext);
   deferred.shift()({ man: {} });

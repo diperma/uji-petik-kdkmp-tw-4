@@ -190,7 +190,7 @@ input.combo-in:focus{cursor:text;outline:2px solid var(--blue);outline-offset:0;
     </div>
 
     <section id="v-ring" role="tabpanel" aria-labelledby="t-ring">
-      <div class="legend">Ringkasan kategori terkini dari snapshot populasi. Selesai berarti gedung selesai, bukan sarpras lengkap atau sudah beroperasi. Belum memiliki lahan bersumber dari rekonstruksi dan perlu verifikasi.</div>
+      <div class="legend">Empat kelompok uji petik mengikuti kondisi pembangunan terbaru dan bukti operasi historis (bukan verifikasi operasi terkini). Gedung terbangun tidak menyatakan sarpras lengkap. Belum memiliki lahan bersumber dari rekonstruksi dan perlu verifikasi; lokasi di luar empat kelompok ditandai Perlu verifikasi.</div>
       <div class="tablewrap"><table id="tblRing"></table></div>
       <p class="note">Klik baris untuk membuka daftar lokasi Perwakilan tersebut. Angka lokasi sudah memperhitungkan usulan perubahan yang disetujui D302. Kategori dan jumlah mengikuti kondisi snapshot terkini, termasuk yang belum terverifikasi atau masih dimuat. Ketentuan pemilihan historis berikut tetap dipakai untuk batas dan persetujuan usulan, bukan penetapan kondisi terkini.
       Maksimal 10 lokasi per Perwakilan; KDKMP belum memiliki lahan maksimal 3, kecuali Perwakilan Maluku, Maluku Utara, dan seluruh wilayah Papua yang tidak dibatasi jumlah kategori belum memiliki lahan (total tetap maksimal 10 lokasi). Komposisi awal wilayah tanpa KDKMP beroperasi: 4 mandek, 3 terbangun dengan kelengkapan, 3 belum memiliki lahan. Wilayah dengan KDKMP beroperasi: beroperasi didahulukan (seluruh 84 titik prioritas yang belum pernah diuji petik BPKP, minimal 3), lalu 3 mandek, 2 terbangun, 2 belum lahan; Jawa Tengah, DIY, dan Jawa Timur tetap 10 KDKMP beroperasi. Bila kategori di kab/kota lokus kurang, diisi mandek dari kab/kota lain di wilayah kerja yang sama. KDKMP sampel TW II/TW III tidak diambil ulang. Wilayah kerja sesuai Peraturan BPKP Nomor 5 Tahun 2026.</p>
@@ -502,6 +502,15 @@ function currentConditionMatch(index, lokus) {
   return nik && entry.nik && nik !== entry.nik ? null : entry;
 }
 function currentConditionText(lokus, state) {
+  const building = currentBuildingText(lokus, state);
+  if (!state || state.loading || state.error || !state.operationIndex) return building;
+  const operation = currentConditionMatch(state.operationIndex, lokus);
+  if (!operation) return building;
+  return 'Bukti beroperasi pada data historis; bukan verifikasi operasi terkini. ' +
+    (operation.row.stale === true ? 'Bukti operasi merupakan retensi historis. ' : '') +
+    'Kondisi pembangunan terbaru (dapat berbeda dari bukti operasi historis): ' + building;
+}
+function currentBuildingText(lokus, state) {
   if (!state || state.loading) return 'Memuat kondisi terbaru…';
   const updated = snapshotUpdatedText(state.man);
   if (state.error || !state.index) return 'Kondisi terbaru belum dapat dimuat. ' + updated;
@@ -525,24 +534,42 @@ function currentConditionText(lokus, state) {
   return parts.join('. ');
 }
 // Presentation only: never replace stored kat/alasan used by proposals and approvals.
-const CURRENT_CATEGORIES = ['Selesai', 'Sedang dibangun', 'Mandek > 3 bulan', 'Belum melapor progres', 'Belum memiliki lahan', 'Belum terverifikasi', 'Memuat'];
+const PRIMARY_CATEGORIES = ['(4) Sudah beroperasi', '(2) Mandek > 3 bulan', '(1) Gedung terbangun', '(3) Belum memiliki lahan'];
+const CURRENT_CATEGORIES = [...PRIMARY_CATEGORIES, 'Perlu verifikasi', 'Memuat'];
+function currentCategoryStyle(category) {
+  return {
+    '(4) Sudah beroperasi': { cls: 'bg4p', color: 'var(--blue)', cell: 'b4' },
+    '(2) Mandek > 3 bulan': { cls: 'bg2', color: 'var(--red)', cell: 'b2' },
+    '(1) Gedung terbangun': { cls: 'bg1', color: 'var(--ink)', cell: '' },
+    '(3) Belum memiliki lahan': { cls: 'bg3', color: 'var(--ink)', cell: '' },
+  }[category] || { cls: '', color: 'var(--mute)', cell: '' };
+}
 function currentLocationView(lokus, state) {
   const reason = currentConditionText(lokus, state);
   const view = category => ({ category, reason, evidence: snapshotUpdatedText(state?.man) });
   if (!state || state.loading) return view('Memuat');
-  if (state.error || !state.index) return view('Belum terverifikasi');
+  if (state.error) return view('Perlu verifikasi');
+  // A separate historical dataset is evidence of past operation, not current operation.
+  // Keep it independent of the building index so shared NIKs do not create duplicates.
+  if (state.operationIndex && currentConditionMatch(state.operationIndex, lokus)) return view('(4) Sudah beroperasi');
+  if (!state.index) return view('Perlu verifikasi');
   const entry = currentConditionMatch(state.index, lokus);
-  if (!entry || entry.row.stale === true) return view('Belum terverifikasi');
-  if (entry.kind === 'belum_lahan') return view('Belum memiliki lahan');
+  if (!entry || entry.row.stale === true) return view('Perlu verifikasi');
+  if (entry.kind === 'belum_lahan') return view('(3) Belum memiliki lahan');
   const r = entry.row, raw = r['Progres terbaru (%)'];
   const progress = raw !== null && raw !== undefined && raw !== '' && typeof raw !== 'boolean' && Number.isFinite(Number(raw)) ? Number(raw) : null;
   const status = r['Status pembangunan'];
   // Completion is building completion only, never evidence of operating or complete sarpras.
-  if (progress === 100 || status === 'Selesai') return view('Selesai');
-  if (r['(2) Mandek > 3 bulan'] === 1 || r['(2) Mandek > 3 bulan'] === true) return view('Mandek > 3 bulan');
-  if (status === 'Sedang dibangun' || (progress > 0 && progress < 100)) return view('Sedang dibangun');
-  if (status === 'Belum melapor progres' || progress === 0) return view('Belum melapor progres');
-  return view('Belum terverifikasi');
+  if (progress === 100 || status === 'Selesai') return view('(1) Gedung terbangun');
+  if (r['(2) Mandek > 3 bulan'] === 1 || r['(2) Mandek > 3 bulan'] === true) return view('(2) Mandek > 3 bulan');
+  // Ongoing/non-reporting construction is not evidence for any numbered group.
+  return view('Perlu verifikasi');
+}
+function visibleCurrentCategories(counts) {
+  return CURRENT_CATEGORIES.filter(category => category !== 'Memuat' && counts[category] > 0);
+}
+function currentCategoryLabel(category) {
+  return category;
 }
 function currentComposition(list, state) {
   const counts = Object.fromEntries(CURRENT_CATEGORIES.map(category => [category, 0]));
@@ -566,9 +593,10 @@ function currentComposition(list, state) {
         const pinned = await reader.pin(...scope);
         if (!alive()) return;
         state.man = pinned.man;
-        const [gerai, belum_lahan] = await Promise.all(['gerai', 'belum_lahan'].map(name => reader.dataset(...scope, name)));
+        const [gerai, belum_lahan, beroperasi] = await Promise.all(['gerai', 'belum_lahan', 'beroperasi'].map(name => reader.dataset(...scope, name)));
         if (!alive()) return;
         state.index = currentConditionIndex({ gerai, belum_lahan });
+        state.operationIndex = currentConditionIndex({ beroperasi });
       } catch (_) {
         if (!alive()) return;
         state.error = true;
@@ -644,7 +672,8 @@ function currentComposition(list, state) {
     ["(1) Terbangun dengan kelengkapan", "bg1", "Terbangun dgn kelengkapan"],
     ["(3) Belum memiliki lahan", "bg3", "Belum memiliki lahan"],
   ];
-  const katInfo = (k) => KATS.find((x) => x[0] === k) || [k, "bg3", k];
+  // Display alias only: retain original serialized KATS values for Firestore rules/history.
+  const katInfo = (k) => k === KATS[3][0] ? [k, 'bg1', 'Gedung terbangun'] : KATS.find((x) => x[0] === k) || [k, "bg3", k];
   const badge = (k) => { const [, cls, lab] = katInfo(k); return `<span class="badge ${cls}">${esc(lab)}</span>`; };
   const tierColor = (d) => d.startsWith("Memiliki semua kategori (1)–(4)") ? "var(--blue)" : d.startsWith("Memiliki semua") ? "var(--ink)" : "var(--red)";
   const short = (pw) => pw.replace("Perwakilan BPKP ", "").replace("Daerah Khusus Ibu Kota Jakarta", "DKI Jakarta").replace("Daerah Istimewa Yogyakarta", "DI Yogyakarta");
@@ -720,7 +749,7 @@ function currentComposition(list, state) {
     $("#foot").textContent = "Sumber kandidat: Portal KDKMP. Pembaruan populasi tidak mengubah lokus terpilih; perubahan lokus melalui persetujuan usulan.";
     const R = DATA.ringkasan;
     $("#fPw").innerHTML = (R.length > 1 ? `<option value="">Semua Perwakilan (${R.length})</option>` : "") + R.map((r) => `<option value="${esc(r.pw)}">${r.no}. ${esc(short(r.pw))}</option>`).join("");
-    $("#fKat").innerHTML = `<option value="">Semua kategori</option>` + CURRENT_CATEGORIES.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+    $("#fKat").innerHTML = `<option value="">Semua kategori</option>`;
     $("#uPw").innerHTML = `<option value="">Semua Perwakilan</option>` + R.map((r) => `<option value="${pwCode(r.pw)}">${r.no}. ${esc(short(r.pw))}</option>`).join("");
     $("#uPwWrap").classList.toggle("hidden", ME.role !== "D302");
     $("#uSt").value = ME.role === "D302" ? "diajukan" : "";
@@ -732,19 +761,26 @@ function currentComposition(list, state) {
   }
   function refresh() {
     if (!DATA) return;
-    compute(); renderKpi(); renderRing(); render(); renderUsul();
+    compute(); refreshCategoryFilter(); renderKpi(); renderRing(); render(); renderUsul();
     const n = USUL.filter((s) => s.status === "diajukan").length;
     $("#usulCnt").textContent = n; $("#usulCnt").classList.toggle("hidden", !n);
+  }
+  function refreshCategoryFilter() {
+    const select = $("#fKat"), previous = select.value;
+    const categories = visibleCurrentCategories(currentComposition(EFF.all, CONDITIONS));
+    select.innerHTML = `<option value="">Semua kategori</option>` + categories.map(category => `<option value="${esc(category)}">${esc(category)}</option>`).join('');
+    select.value = categories.includes(previous) ? previous : '';
   }
   function renderKpi() {
     const L = EFF.all, counts = currentComposition(L, CONDITIONS);
     const k = [[DATA.ringkasan.length, "Perwakilan\nBPKP", "var(--navy)"], [L.length, "lokasi uji petik\nKDKMP", "var(--navy)"],
-      ...CURRENT_CATEGORIES.map(category => [counts[category], category + '\n(terkini)', category === 'Mandek > 3 bulan' ? 'var(--red)' : 'var(--ink)'])];
-    $("#kpis").innerHTML = k.map(([n, l, col]) => `<div class="kpi" style="border-left-color:${col}"><div class="n" style="color:${col}">${fmt(n)}</div><div class="l">${esc(l).replace("\n", "<br>")}</div></div>`).join("");
+      ...PRIMARY_CATEGORIES.filter(category => counts[category] > 0).map(category => [counts[category], currentCategoryLabel(category), currentCategoryStyle(category).color])];
+    $("#kpis").innerHTML = k.map(([n, l, col]) => `<div class="kpi" style="border-left-color:${col}"><div class="n" style="color:${col}">${fmt(n)}</div><div class="l">${esc(l).replace("\n", "<br>")}</div></div>`).join("") + (!CONDITIONS || CONDITIONS.loading ? `<p class="sub" role="status">Memuat kondisi terbaru…</p>` : counts['Perlu verifikasi'] ? `<p class="sub" role="status">Perlu verifikasi: ${fmt(counts['Perlu verifikasi'])} lokasi di luar empat kelompok; gunakan filter kategori untuk meninjau.</p>` : '');
   }
   function renderRing() {
+    const categories = visibleCurrentCategories(currentComposition(EFF.all, CONDITIONS));
     const cell = (v, cls) => v ? `<td class="num ${cls || ""}">${fmt(v)}</td>` : `<td class="num z">–</td>`;
-    $("#tblRing").innerHTML = `<thead><tr><th class="num">No</th><th>Perwakilan</th><th>Lokasi kantor</th><th>Kab/Kota lokasi uji petik</th>${CURRENT_CATEGORIES.map(category => `<th class="num">${esc(category)}<br>(terkini)</th>`).join('')}<th class="num">Jml</th><th class="num">Usulan<br>menunggu</th></tr></thead><tbody>` +
+    $("#tblRing").innerHTML = `<thead><tr><th class="num">No</th><th>Perwakilan</th><th>Lokasi kantor</th><th>Kab/Kota lokasi uji petik</th>${categories.map(category => `<th class="num">${esc(currentCategoryLabel(category)).replace('\n', '<br>')}</th>`).join('')}<th class="num">Jml</th><th class="num">Usulan<br>menunggu</th></tr></thead><tbody>` +
       DATA.ringkasan.map((r) => {
         const code = pwCode(r.pw), lst = EFF.lists.get(code) || [], counts = currentComposition(lst, CONDITIONS), np = pending(code).length;
         // Hanya kab/kota yang masih memiliki lokasi dalam daftar efektif setelah persetujuan.
@@ -752,7 +788,7 @@ function currentComposition(list, state) {
         const kabCell = kab.length
           ? kab.map((kb) => esc(title(kb))).join(", ")
           : `<span class="z">–</span>`;
-        return `<tr class="click" data-pw="${esc(r.pw)}"><td class="no">${r.no}</td><td>${esc(short(r.pw))}</td><td>${esc(r.kantor)}</td><td style="min-width:170px;max-width:260px">${kabCell}</td>${CURRENT_CATEGORIES.map(category => cell(counts[category])).join('')}<td class="num"><b>${fmt(lst.length)}</b></td>${np ? `<td class="num"><span class="st st-diajukan">${np}</span></td>` : `<td class="num z">–</td>`}</tr>`;
+        return `<tr class="click" data-pw="${esc(r.pw)}"><td class="no">${r.no}</td><td>${esc(short(r.pw))}</td><td>${esc(r.kantor)}</td><td style="min-width:170px;max-width:260px">${kabCell}</td>${categories.map(category => cell(counts[category], currentCategoryStyle(category).cell)).join('')}<td class="num"><b>${fmt(lst.length)}</b></td>${np ? `<td class="num"><span class="st st-diajukan">${np}</span></td>` : `<td class="num z">–</td>`}</tr>`;
       }).join("") + `</tbody>`;
   }
   $("#tblRing").addEventListener("click", (ev) => { const tr = ev.target.closest("tr.click"); if (!tr) return; $("#fPw").value = tr.dataset.pw; show("daftar"); render(); });
@@ -772,7 +808,7 @@ function currentComposition(list, state) {
       const list = EFF.lists.get(code) || [], counts = currentComposition(list, CONDITIONS), pj = komposisi(proyeksi(code)), np = pending(code).length;
       const full = pj.n >= MAXN;
       $("#komp").innerHTML = `<b>${esc(short(selPw))}</b><span class="sep"></span>
-        <span class="chip ${list.length >= MAXN ? "full" : ""}">${list.length}/${MAXN} lokasi</span>${CURRENT_CATEGORIES.map(category => `<span class="chip">${esc(category)}: ${counts[category]}</span>`).join('')}
+        <span class="chip ${list.length >= MAXN ? "full" : ""}">${list.length}/${MAXN} lokasi</span>${visibleCurrentCategories(counts).map(category => `<span class="chip ${currentCategoryStyle(category).cls}">${esc(category)}: ${counts[category]}</span>`).join('')}
         <span class="sub">Kategori terkini; batas/persetujuan usulan tetap memakai kategori pemilihan historis${tanpaBatasLahan(code) ? ' (tanpa batas kategori lahan)' : ' (maks. 3 kategori lahan)'}.</span>
         ${np ? `<span class="sep"></span><span class="sub">${np} usulan menunggu · proyeksi batas historis jika disetujui: ${pj.n} lokasi, kategori lahan historis ${pj.k3}</span>` : ""}
         <span class="grow"></span><button class="btn btn-navy" id="btnTambah" type="button" ${full ? "disabled" : ""} title="${full ? "Daftar (termasuk usulan menunggu) sudah 10 lokasi; usulkan ganti atau hapus" : ""}">+ Usulkan tambah lokasi</button>`;
@@ -788,7 +824,7 @@ function currentComposition(list, state) {
         const p = lock.get(x.kode), c = pwCode(x.pw), ket = ketPerubahan(x);
         const chg = [ket ? `<span class="st st-disetujui">${esc(ket)}</span>` : "", p ? `<span class="st st-diajukan">Usulan ${p.jenis === "hapus" ? "hapus" : "ganti"} menunggu</span>` : ""].filter(Boolean).join("<br>");
         const aksi = canPropose(c) ? `<button class="mini" data-act="ganti" data-pw="${c}" data-kode="${esc(x.kode)}" ${p ? "disabled" : ""}>Ganti</button> <button class="mini r" data-act="hapus" data-pw="${c}" data-kode="${esc(x.kode)}" ${p ? "disabled" : ""}>Hapus</button>` : "";
-        return `<tr><td class="num">${x.no}</td>${aksiOn ? `<td style="white-space:nowrap">${aksi}</td>` : ""}<td>${esc(short(x.pw))}</td><td style="min-width:110px">${esc(title(x.kab))}</td><td class="num">${x.urut}</td><td><span class="badge">${esc(view.category)}</span></td><td style="min-width:220px">${esc(x.nama)}</td><td>${esc(x.kec)}</td><td>${esc(x.desa)}</td><td style="white-space:nowrap">${esc(x.kode)}</td><td>${esc(x.nik)}</td><td style="min-width:260px;max-width:340px">${esc(view.reason)}</td><td class="sub" style="min-width:220px">${esc(view.evidence)}<details><summary>Pemilihan historis</summary>${esc(x.kat)}<br>${esc(x.alasan)}</details></td><td>${map}</td><td class="chg" style="min-width:150px">${chg || '<span class="z">–</span>'}</td></tr>`;
+        return `<tr><td class="num">${x.no}</td>${aksiOn ? `<td style="white-space:nowrap">${aksi}</td>` : ""}<td>${esc(short(x.pw))}</td><td style="min-width:110px">${esc(title(x.kab))}</td><td class="num">${x.urut}</td><td><span class="badge ${view.category === '(4) Sudah beroperasi' && x.kat === KATS[1][0] ? 'bg4o' : currentCategoryStyle(view.category).cls}">${esc(view.category)}</span></td><td style="min-width:220px">${esc(x.nama)}</td><td>${esc(x.kec)}</td><td>${esc(x.desa)}</td><td style="white-space:nowrap">${esc(x.kode)}</td><td>${esc(x.nik)}</td><td style="min-width:260px;max-width:340px">${esc(view.reason)}</td><td class="sub" style="min-width:220px">${esc(view.evidence)}<details><summary>Pemilihan historis</summary>${esc(x.kat)}<br>${esc(x.alasan)}</details></td><td>${map}</td><td class="chg" style="min-width:150px">${chg || '<span class="z">–</span>'}</td></tr>`;
       }).join("") + `</tbody>`;
   }
   $("#tblDaftar").addEventListener("click", (ev) => {
@@ -910,6 +946,7 @@ function currentComposition(list, state) {
     const out = new Map();
     const put = (x) => { if (!x.kode || EXCL.has(x.prov) || out.has(x.kode)) return; out.set(x.kode, x); };
     for (const r of o) {
+      if (r.stale === true) continue;
       const k = r["Kategori uji petik TW IV"] || "", gg = gk.get(r["Kode Desa"]) || {};
       let lat = N(gg.Latitude), lon = N(gg.Longitude);
       if (lat == null && r["Koordinat SIMKOPDES"]) { const p = String(r["Koordinat SIMKOPDES"]).split(",").map(Number); if (p.length === 2 && p.every(isFinite)) [lat, lon] = p; }
@@ -919,11 +956,13 @@ function currentComposition(list, state) {
       else put({ ...base, kat: KATS[1][0], alasan: "Beroperasi", blok: "Sudah diuji petik BPKP (TW II/III)" });
     }
     for (const r of g) {
+      if (r.stale === true) continue; // Retained history is not a current candidate.
       const base = { prov: r.Provinsi, kab: r["Kabupaten/Kota"], kec: r.Kecamatan, desa: r["Desa/Kelurahan"], kode: r["Kode Desa"], nik: r["NIK Koperasi (master)"], nama: r["Nama Koperasi (portal)"], lat: N(r.Latitude), lon: N(r.Longitude) };
-      if (r["(2) Mandek > 3 bulan"] === 1) put({ ...base, kat: KATS[2][0], alasan: `Progres ${readerEvidenceNumber(readerProgress(r, pinned.legacy), dec)}%, lewat target ${fmt(r["Hari lewat target"])} hari (${r["Kategori keterlambatan"] || "-"})` });
-      else if (r["(1) Terbangun dengan kelengkapan"] === 1 && r["(4) Beroperasi"] !== 1) put({ ...base, kat: KATS[3][0], alasan: `Gedung 100%, sarpras ${readerEvidenceNumber(r["Item sarpras tiba/terpasang"], fmt)} item tiba/terpasang (${r["Status kelengkapan sarpras"] || "-"}) — gali hambatan kelengkapan` });
+      const progress = readerProgress(r, pinned.legacy);
+      if ((progress !== null && progress !== '' && typeof progress !== 'boolean' && Number(progress) === 100) || r['Status pembangunan'] === 'Selesai') put({ ...base, kat: KATS[3][0], alasan: 'Gedung terbangun: status selesai atau progres portal 100%; kelengkapan sarpras belum diverifikasi (data sarpras historis/parsial).' });
+      else if (r["(2) Mandek > 3 bulan"] === 1 || r["(2) Mandek > 3 bulan"] === true) put({ ...base, kat: KATS[2][0], alasan: `Progres ${readerEvidenceNumber(progress, dec)}%, lewat target ${fmt(r["Hari lewat target"])} hari (${r["Kategori keterlambatan"] || "-"})` });
     }
-    for (const r of b) put({ prov: r.Provinsi, kab: r["Kabupaten/Kota"], kec: r.Kecamatan, desa: r["Desa/Kelurahan"], kode: r["Kode Desa"], nik: r["NIK Koperasi"], nama: r["Nama Koperasi"], lat: null, lon: null, kat: KATS[4][0], alasan: "Kode desa belum ada di data pemetaan lahan portal" });
+    for (const r of b.filter(r => r.stale !== true)) put({ prov: r.Provinsi, kab: r["Kabupaten/Kota"], kec: r.Kecamatan, desa: r["Desa/Kelurahan"], kode: r["Kode Desa"], nik: r["NIK Koperasi"], nama: r["Nama Koperasi"], lat: null, lon: null, kat: KATS[4][0], alasan: "Tercatat belum memiliki lahan pada dataset rekonstruksi (kode desa belum ada di pemetaan lahan portal); perlu verifikasi kondisi kini" });
     const ord = { 4: 0, 2: 1, 1: 2, 3: 3 };
     KAND[key] = [...out.values()].sort((a, b) => ord[a.kat[1]] - ord[b.kat[1]] || String(a.kab).localeCompare(b.kab) || String(a.kec).localeCompare(b.kec) || String(a.desa).localeCompare(b.desa));
     return KAND[key];
@@ -938,7 +977,7 @@ function currentComposition(list, state) {
     openDlg(`${lama ? "Usulkan ganti lokasi" : "Usulkan tambah lokasi"} · ${short(pwName(code))}`,
       `<div class="${lama ? "two" : ""}">${lama ? lokBox(lama, "Lokasi semula") : ""}<div class="box" id="kSel"><div class="h">KDKMP usulan</div><span class="sub">Pilih satu KDKMP dari tabel di bawah.</span></div></div>
        <div class="toolbar" style="margin-top:12px">
-         <div class="f"><label for="kKat">Kategori</label><select id="kKat"><option value="">Semua kategori uji petik</option><option value="(4)">(4) Sudah beroperasi</option><option value="(2)">(2) Mandek &gt; 3 bulan</option><option value="(1)">(1) Terbangun dengan kelengkapan</option><option value="(3)">(3) Belum memiliki lahan</option></select></div>
+         <div class="f"><label for="kKat">Kategori</label><select id="kKat"><option value="">Semua kategori uji petik</option><option value="(4)">(4) Sudah beroperasi</option><option value="(2)">(2) Mandek &gt; 3 bulan</option><option value="(1)">(1) Gedung terbangun</option><option value="(3)">(3) Belum memiliki lahan</option></select></div>
          <div class="f"><label for="kKab">Kabupaten/Kota</label><select id="kKab"><option value="">Semua kab/kota</option></select></div>
          <div class="f"><label for="kQ">Cari (desa, kecamatan, nama, kode)</label><input id="kQ" type="search"></div>
        </div>
