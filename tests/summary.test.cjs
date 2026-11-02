@@ -7,7 +7,9 @@ const logic = html.slice(html.indexOf('  function komposisi('), html.indexOf('  
 const rendering = html.slice(html.indexOf('  function renderRing()'), html.indexOf('  $("#tblRing").addEventListener'));
 function setup() {
   const elements = {};
-  const context = vm.createContext({ assert, elements });
+  const context = vm.createContext({ assert, elements, Intl, Date });
+  vm.runInContext(html.slice(html.indexOf('function snapshotUpdatedText('), html.indexOf('// Latest progress')), context);
+  vm.runInContext(html.split('// CURRENT_CONDITION_BEGIN')[1].split('// CURRENT_CONDITION_END')[0], context);
   vm.runInContext(`
     const $ = (id) => elements[id] ||= { innerHTML: '' };
     const esc = (x) => String(x ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -15,7 +17,7 @@ function setup() {
     const tierColor = () => 'blue';
     const pwCode = () => 'P01', pwName = () => 'Aceh';
     const ms = (t) => t || 0, MAXN = 10, MAX_LAHAN = 3;
-    let EFF, USUL = [];
+    let EFF, USUL = [], CONDITIONS = null;
     const loc = (kode, kab) => ({ kode, kab, pw: 'Aceh', kat: '(4)', urut: 1 });
     const DATA = { ringkasan: [{ no: 1, pw: 'Aceh', kab: 'Kabupaten Awal', kantor: 'Kantor', dasar: 'Dasar awal' }], lokasi: [loc('111', 'Kabupaten Awal')] };
     ${logic}

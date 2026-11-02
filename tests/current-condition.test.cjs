@@ -46,7 +46,8 @@ test('all building statuses are shown independently of original category; mandek
   for (const status of ['Selesai', 'Sedang dibangun', 'Belum melapor progres']) {
     const value = text(lokus, state([row('123', lokus.kode, { 'Status pembangunan': status, '(2) Mandek > 3 bulan': 1, 'Hari sejak dibuat': 340, 'Hari lewat target': 250 })]));
     assert.match(value, new RegExp(status));
-    assert.match(value, /Mandek > 3 bulan.*340 hari.*250 hari/);
+    if (status === 'Selesai') assert.doesNotMatch(value, /Mandek > 3 bulan/);
+    else assert.match(value, /Mandek > 3 bulan.*340 hari.*250 hari/);
     assert.doesNotMatch(value, /Beroperasi/);
   }
   assert.match(text(lokus, state([row('123', lokus.kode, { 'Status pembangunan': 'unknown' })])), /Status pembangunan belum diketahui/);
@@ -58,11 +59,11 @@ test('missing and landless are distinct, and original category/reason remain imm
   assert.match(text(lokus, landless), /Tercatat belum memiliki lahan pada dataset rekonstruksi/);
   assert.equal(JSON.stringify(lokus), before);
   assert.match(html, /esc\(x\.alasan\)/);
-  assert.match(html, /badge\(x\.kat\)/);
+  assert.match(html, /esc\(view\.category\)/);
 });
-test('same escaped plain text in table and CSV; loading/failure do not block original view', () => {
-  assert.match(html, /esc\(currentConditionText\(x, CONDITIONS\)\)/);
-  assert.match(html, /q\(currentConditionText\(x, CONDITIONS\)\)/);
+test('same derived plain text in table and CSV; loading/failure never fall back to historical categories', () => {
+  assert.match(html, /esc\(view\.reason\)/);
+  assert.match(html, /view\.reason, view\.evidence, x\.kat, x\.alasan/);
   assert.match(text(lokus, null), /Memuat/);
   assert.match(text(lokus, { error: true }), /belum dapat dimuat/);
   assert.match(html, /USUL = \[\]; start\(\); loadCurrentConditions\(\)/);
@@ -71,7 +72,7 @@ test('loader is cached per session, guarded, and reads all gerai + landless in a
   const calls = [], deferred = [];
   const loaderContext = vm.createContext({
     currentConditionIndex: index,
-    render: () => calls.push('render'),
+    refresh: () => calls.push('refresh'),
     reader: { pin: () => new Promise(resolve => deferred.push(resolve)), dataset: async (...args) => { calls.push(args); return dataset([row()]); } },
   });
   const loader = html.slice(html.indexOf('  function loadCurrentConditions()'), html.indexOf('  function resetReader()'));
@@ -81,7 +82,7 @@ test('loader is cached per session, guarded, and reads all gerai + landless in a
   deferred.shift()({ man: {} });
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(calls.slice(0, 2).map(a => Array.from(a)), [['populasi_tw4', '', 'gerai'], ['populasi_tw4', '', 'belum_lahan']]);
-  assert.equal(calls.at(-1), 'render');
+  assert.equal(calls.at(-1), 'refresh');
   calls.length = 0;
   vm.runInContext('CONDITIONS = null; ME = { role: "PW", pw: "P10" }; loadCurrentConditions();', loaderContext);
   deferred.shift()({ man: {} });
