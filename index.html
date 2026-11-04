@@ -133,6 +133,8 @@ dialog::backdrop{background:rgba(17,24,39,.45)}
 tr.on .pick{border-color:var(--blue);background:radial-gradient(var(--blue) 45%,#fff 50%)}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:6px;font-size:13px;z-index:50;max-width:calc(100vw - 32px);box-shadow:0 8px 20px rgba(0,0,0,.2)}
 .toast.bad{background:var(--red)}
+#dlgBody .box + .box{margin-top:10px}
+#dlgBody .tablewrap{margin-top:10px;max-height:44vh}
 @media (max-width:1000px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.top h1{font-size:18px}.kpi .n{font-size:22px}.two{grid-template-columns:1fr}}
 /* dropdown bisa dicari (combo.js) */
@@ -588,6 +590,212 @@ function currentComposition(list, state) {
 }
 // CURRENT_CONDITION_END
 
+// SARPRAS_DETAIL_BEGIN
+// Detail per item sarpras — fixed 8-shard contract v3 (SARPRAS-DETAIL-SHARDS-CONTRACT.md).
+// Pure helpers only: no DOM, Firestore, auth or modal references in this block.
+const SARPAS_DETAIL_SHARDS = Array.from({ length: 8 }, (_v, i) => "sarpras_detail_" + String(i).padStart(2, "0"));
+const SARPAS_DETAIL_SCHEMA = {
+  version: 3, shards: [...SARPAS_DETAIL_SHARDS], shard_count: 8, shard_key: "portal_id",
+  algorithm: "sha256-first-byte-mod-8", identity: ["portal_id", "NIK Koperasi (master)", "Kode Desa"],
+  item_missing_key: "null", geography_join: "gerai.portal_id", summary_only: ["gerai", "mandek", "terbangun"],
+};
+const SARPAS_ITEM_KEYS = ["status", "vendor", "jumlah_paket", "catatan"];
+// Whitelist verbatim from sarpras_fetch.py: known portal item statuses only; anything else fails closed.
+const SARPAS_ITEM_STATUSES = ["tiba", "terpasang", "pengiriman", "transit", "shipment", "tanpa_status"];
+const SARPAS_UNVERIFIED_STATUSES = ["shipment", "tanpa_status"];
+const SARPAS_DELIVERED_STATUSES = ["tiba", "terpasang"];
+const SARPAS_HEX64_RE = /^[0-9a-f]{64}$/;
+const SARPAS_STATE_TEXT = { fresh: "Bukti sarpras dari sumber terkini", historic: "Bukti sarpras historis", unknown: "Keadaan sumber sarpras tidak diketahui" };
+const SARPAS_GAP_TEXT = {
+  no_source: "Tidak ada sumber sarpras pada snapshot ini.",
+  record_missing: "Record koperasi tidak ditemukan pada data sumber.",
+  detail_unavailable: "Detail per item tidak tersedia dari portal.",
+  empty_items: "Detail ditemukan tetapi tanpa item terlapor.",
+  cached_source: "Bukti bersumber dari cache historis; tanggal sumber asli dipertahankan.",
+  unverified_status_semantics: "Semua status item belum terverifikasi; bukan bukti tiba/terpasang.",
+};
+
+function sarprasValueEq(a, b) {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((v, i) => sarprasValueEq(v, b[i]));
+  return false;
+}
+function sarprasDetailSchemaOk(schema) {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return false;
+  const want = Object.keys(SARPAS_DETAIL_SCHEMA).sort(), have = Object.keys(schema).sort();
+  return JSON.stringify(have) === JSON.stringify(want) &&
+    want.every(k => sarprasValueEq(schema[k], SARPAS_DETAIL_SCHEMA[k]));
+}
+// Each v3 shard spec must carry projection_version 3 (strict number) and row_partition reconciliation.
+function sarprasShardSpecOk(spec) {
+  return !!spec && typeof spec === "object" && spec.projection_version === 3 && spec.reconciliation_mode === "row_partition";
+}
+function sarprasDetailMode(man) {
+  const datasets = man && man.datasets && typeof man.datasets === "object" && !Array.isArray(man.datasets) ? Object.keys(man.datasets) : null;
+  if (!datasets) return "invalid";
+  const declared = man.sarpras_detail_schema;
+  const detailNames = datasets.filter(n => n === "sarpras_detail" || n.startsWith("sarpras_detail_"));
+  if (declared != null) {
+    if (!sarprasDetailSchemaOk(declared)) return "invalid";
+    if (detailNames.length !== SARPAS_DETAIL_SHARDS.length || SARPAS_DETAIL_SHARDS.some(n => !detailNames.includes(n) || !sarprasShardSpecOk(man.datasets[n]))) return "invalid";
+    return "v3";
+  }
+  if (!detailNames.length) return "absent";
+  return detailNames.length === 1 && detailNames[0] === "sarpras_detail" ? "legacy" : "invalid";
+}
+// Exact shard destination: SHA-256 of the exact portal ID UTF-8 bytes, unsigned first byte mod 8. No trimming or folding.
+async function sarprasPortalDigest(text, subtle, Encoder = TextEncoder) {
+  const digest = await subtle.digest("SHA-256", new Encoder().encode(String(text)));
+  return new Uint8Array(digest);
+}
+function sarprasShardIndex(digest) {
+  return digest && digest.length ? (digest[0] & 255) % 8 : -1;
+}
+function sarprasScope(me) {
+  if (!me) return null;
+  if (me.role === "D302") return ["populasi_tw4", ""];
+  // PW codes are exactly P01–P36 (Lampiran II Peraturan BPKP No. 5/2026); 'ALL' or any other value is refused.
+  if (me.role === "PW" && typeof me.pw === "string" && /^P(?:0[1-9]|1[0-9]|2[0-9]|3[0-6])$/.test(me.pw)) return ["populasi_pw", me.pw + "_"];
+  return null; // Never fall back from a PW account to the national scope.
+}
+const sarprasObj = (cols, values) => {
+  const row = {};
+  for (let i = 0; i < cols.length; i++) row[cols[i]] = values[i];
+  return row;
+};
+// Strict identity: NIK (master) and Kode Desa compared with the document trim normalization
+// (explicit, documented policy); the portal ID is NOT normalized — it is kept as the exact
+// string whose UTF-8 bytes feed the shard hash. Nonempty only; duplicates are never deduplicated away.
+function sarprasIdentity(gerai, lokus) {
+  const nik = lokus && lokus.nik != null ? String(lokus.nik).trim() : "";
+  const kode = lokus && lokus.kode != null ? String(lokus.kode).trim() : "";
+  if (!nik || !kode) return { ok: false, reason: "Identitas lokus tidak lengkap (NIK dan Kode Desa wajib); detail per item tidak diambil." };
+  const hits = [];
+  const rows = gerai && Array.isArray(gerai.rows) ? gerai.rows : [];
+  const cols = gerai && Array.isArray(gerai.cols) ? gerai.cols : [];
+  for (const values of rows) {
+    const row = sarprasObj(cols, values);
+    const rnik = row["NIK Koperasi (master)"] == null ? "" : String(row["NIK Koperasi (master)"]).trim();
+    const rkode = row["Kode Desa"] == null ? "" : String(row["Kode Desa"]).trim();
+    const pid = row.portal_id;
+    if (rnik && rkode && rnik === nik && rkode === kode && typeof pid === "string" && pid !== "" && pid.trim() !== "") hits.push(pid);
+  }
+  if (!hits.length) return { ok: false, reason: "Tidak ada padanan identitas (NIK + Kode Desa) pada data gerai snapshot; detail per item tidak diambil, bukan berarti kosong." };
+  if (hits.length > 1) return { ok: false, reason: "Identitas tidak unik: " + hits.length + " record gerai dengan NIK dan Kode Desa yang sama (termasuk kemungkinan duplikat); perlu verifikasi, detail per item tidak diambil." };
+  return { ok: true, portalId: hits[0] };
+}
+// Row identity check: both sides nonempty and equal (NIK/Kode use the trim policy); an empty NIK
+// or Kode on either side is a mismatch, never a silent pass.
+function sarprasRowMismatch(row, lokus) {
+  const idv = (v) => (v == null ? "" : String(v).trim());
+  if (!row) return true;
+  const nikRow = idv(row["NIK Koperasi (master)"]), nikLokus = idv(lokus && lokus.nik);
+  const kodeRow = idv(row["Kode Desa"]), kodeLokus = idv(lokus && lokus.kode);
+  return !(nikRow && nikLokus && nikRow === nikLokus && kodeRow && kodeLokus && kodeRow === kodeLokus);
+}
+function sarprasDetailRow(shard, portalId) {
+  if (!shard || !Array.isArray(shard.cols) || !Array.isArray(shard.rows) || typeof portalId !== "string" || portalId === "") return { ok: false, err: "Dataset shard detail sarpras atau Portal ID tidak valid." };
+  let hit = null;
+  for (const values of shard.rows) {
+    const row = sarprasObj(shard.cols, values);
+    // Exact portal ID string equality; presence of the exact value is required, not a trimmed match.
+    if (row.portal_id === portalId) {
+      if (hit) return { ok: false, err: "Portal ID duplikat pada shard detail; integritas gagal." };
+      hit = row;
+    }
+  }
+  if (!hit) return { ok: false, err: "Portal ID tidak ditemukan pada shard detail sesuai hash; sebaran shard gagal." };
+  return { ok: true, row: hit };
+}
+// Compact v2 item cell semantics: absent item keys mean null, never zero. Statuses must be in the
+// known portal whitelist (sarpras_fetch.py); quantities must be null or a nonnegative finite number.
+// A catalog digest must be exactly 64 lowercase hex and resolve as an own property of the pinned registry.
+function sarprasDetailParse(cell, catalogs) {
+  if (cell == null) return { ok: true, items: null, catalog: null, provenance: null, semantics: null };
+  if (typeof cell !== "object" || Array.isArray(cell)) return { ok: false, err: "Sel detail sarpras tidak valid." };
+  const countOk = (v) => v == null || (typeof v === "number" && Number.isFinite(v) && v >= 0);
+  const items = cell.sarpras_items == null ? null : cell.sarpras_items;
+  if (items != null && (typeof items !== "object" || Array.isArray(items))) return { ok: false, err: "Daftar item detail tidak valid." };
+  for (const id of Object.keys(items || {})) {
+    const item = items[id];
+    if (!item || typeof item !== "object" || Array.isArray(item)) return { ok: false, err: "Item detail " + id + " tidak valid." };
+    if (!(typeof item.status === "string" && SARPAS_ITEM_STATUSES.includes(item.status))) return { ok: false, err: "Item detail " + id + " memuat status tidak dikenal." };
+    if (!countOk(item.jumlah_paket)) return { ok: false, err: "Item detail " + id + " memuat jumlah paket tidak valid." };
+    for (const key of Object.keys(item)) if (!SARPAS_ITEM_KEYS.includes(key)) return { ok: false, err: "Item detail " + id + " memuat kolom tidak dikenal." };
+  }
+  const digest = cell.sarpras_catalog_sha256;
+  let catalog = null;
+  if (digest != null && digest !== "") {
+    if (typeof digest !== "string" || !SARPAS_HEX64_RE.test(digest)) return { ok: false, err: "Referensi katalog tidak berbentuk hash SHA-256 64 heksadesimal." };
+    const pool = catalogs && typeof catalogs === "object" && !Array.isArray(catalogs) && Object.hasOwn(catalogs, digest) ? catalogs[digest] : null;
+    if (!Array.isArray(pool) || !pool.length) return { ok: false, err: "Referensi katalog tidak dapat diselesaikan pada registry katalog snapshot terpin." };
+    for (const id of Object.keys(items || {})) if (!pool.some(it => it && typeof it === "object" && it.id === id)) return { ok: false, err: "Item detail " + id + " tidak terdapat pada katalog terpin." };
+    catalog = pool;
+  }
+  return { ok: true, items, catalog, provenance: cell.sarpras_detail_provenance ?? null, semantics: cell.sarpras_status_semantics ?? null };
+}
+// Counts derive only from known statuses, delivered only from tiba/terpasang; any invented/unknown
+// status or unverified-only detail makes the counts unknown, never a labeled arrival.
+function sarprasDelivery(items) {
+  const values = items && typeof items === "object" && !Array.isArray(items) ? Object.values(items).filter(v => v && typeof v === "object") : [];
+  if (!values.length) return null;
+  const statuses = values.map(v => (typeof v.status === "string" ? v.status : ""));
+  if (statuses.some(s => !SARPAS_ITEM_STATUSES.includes(s))) return null;
+  if (statuses.every(s => SARPAS_UNVERIFIED_STATUSES.includes(s))) return null;
+  return {
+    reported: values.length,
+    tiba: statuses.filter(s => s === "tiba").length,
+    terpasang: statuses.filter(s => s === "terpasang").length,
+    unverified: [...new Set(statuses.filter(s => SARPAS_UNVERIFIED_STATUSES.includes(s)))],
+  };
+}
+function sarprasDeliveryText(delivery, hasItems) {
+  const note = " Hitungan hanya dari status tiba/terpasang; bukan bukti kelengkapan dan bukan klaim kosong.";
+  if (!hasItems) return "Daftar item tidak tersedia pada snapshot ini; belum diketahui (bukan nol)." + note;
+  if (!delivery) return "Tidak ada status tiba/terpasang terverifikasi pada bukti per item; hitungan tiba/terpasang belum diketahui (bukan nol). Status tampil apa adanya dan perlu verifikasi." + note;
+  return "Tiba: " + delivery.tiba + " · Terpasang: " + delivery.terpasang + " · Item terlapor: " + delivery.reported + " ·" + note;
+}
+// Display order only: sorted by catalog order, nulls last, tie by item id; catalog list order itself remains evidence.
+function sarprasCatalogSorted(catalog) {
+  const list = (Array.isArray(catalog) ? catalog : []).filter(it => it && typeof it === "object" && it.id != null);
+  return list.map((it, i) => ({ i, it })).sort((a, b) => {
+    const oa = typeof a.it.order === "number" ? a.it.order : Number.MAX_SAFE_INTEGER;
+    const ob = typeof b.it.order === "number" ? b.it.order : Number.MAX_SAFE_INTEGER;
+    return oa - ob || String(a.it.id).localeCompare(String(b.it.id)) || a.i - b.i;
+  }).map(x => x.it);
+}
+// Lazy resolution: pin the scope once, resolve identity strictly, then load exactly ONE of the eight shards. No PW→national fallback.
+async function sarprasResolveDetail(reader, scope, lokus, subtle, Encoder = TextEncoder) {
+  try {
+    if (!reader || !Array.isArray(scope)) throw new Error("Sesi data telah berakhir.");
+    const pinned = await reader.pin(scope[0], scope[1]);
+    const man = pinned && pinned.man;
+    const mode = sarprasDetailMode(man);
+    if (mode === "invalid") throw new Error("Skema dataset detail sarpras pada snapshot tidak valid; muatan detail ditolak (fail closed).");
+    if (mode !== "v3") return { phase: mode, man };
+    const gerai = await reader.dataset(scope[0], scope[1], "gerai");
+    const id = sarprasIdentity(gerai, lokus);
+    if (!id.ok) return { phase: "identity", reason: id.reason, man };
+    const digest = await sarprasPortalDigest(id.portalId, subtle, Encoder);
+    const shard = SARPAS_DETAIL_SHARDS[sarprasShardIndex(digest)];
+    if (!shard) throw new Error("Shard detail tidak dapat ditentukan dari Portal ID.");
+    const loaded = await reader.dataset(scope[0], scope[1], shard);
+    const hit = sarprasDetailRow(loaded, id.portalId);
+    if (!hit.ok) throw new Error(hit.err);
+    if (sarprasRowMismatch(hit.row, lokus)) throw new Error("Identitas NIK/Kode Desa baris shard tidak cocok dengan lokasi; integritas gagal.");
+    const parsed = sarprasDetailParse(hit.row.sarpras_detail, man && man.sarpras_catalogs);
+    if (!parsed.ok) throw new Error(parsed.err);
+    return { phase: "done", man, shard, row: hit.row, detail: parsed, delivery: sarprasDelivery(parsed.items), portalId: id.portalId };
+  } catch (e) {
+    return { phase: "error", err: (e && e.message) || String(e) };
+  }
+}
+// Session/stale guard: any change of session epoch, reader, account, or a closed modal makes in-flight renders stale.
+function sarprasPopupStale(state, now) {
+  return !state || !now || !now.me || state.session !== now.session || state.reader !== now.reader || now.dlgOpen === false;
+}
+// SARPRAS_DETAIL_END
+
   const KAND = {};
   let CONDITIONS = null;
   let READER = null, SESSION = 0;
@@ -840,18 +1048,23 @@ function currentComposition(list, state) {
     } else $("#komp").classList.add("hidden");
     const aksiOn = rows.some((x) => canPropose(pwCode(x.pw)));
     const lock = new Map(); for (const s of USUL) if (s.status === "diajukan" && s.lama) lock.set(s.lama.kode, s);
-    $("#tblDaftar").innerHTML = `<thead><tr><th class="num">No</th>${aksiOn ? "<th>Usulan</th>" : ""}<th>Perwakilan</th><th>Kab/Kota</th><th class="num">Urut</th><th>Kategori terkini</th><th>Nama Koperasi</th><th>Kecamatan</th><th>Desa/Kelurahan</th><th>Kode Desa</th><th>NIK Koperasi</th><th>Keterangan terkini</th><th>Sumber / pemilihan historis</th><th>Peta</th><th>Perubahan</th></tr></thead><tbody>` +
+    $("#tblDaftar").innerHTML = `<thead><tr><th class="num">No</th>${aksiOn ? "<th>Usulan</th>" : ""}<th>Perwakilan</th><th>Kab/Kota</th><th class="num">Urut</th><th>Kategori terkini</th><th>Nama Koperasi</th><th>Kecamatan</th><th>Desa/Kelurahan</th><th>Kode Desa</th><th>NIK Koperasi</th><th>Keterangan terkini</th><th>Sumber / pemilihan historis</th><th>Peta</th><th>Detail</th><th>Perubahan</th></tr></thead><tbody>` +
       rows.map((x) => {
         const view = currentLocationView(x, CONDITIONS);
         const map = (x.lat && x.lon) ? `<a href="https://www.google.com/maps?q=${encodeURIComponent(x.lat + "," + x.lon)}" target="_blank" rel="noopener">Buka</a>` : `<span class="z">–</span>`;
         const p = lock.get(x.kode), c = pwCode(x.pw), ket = ketPerubahan(x);
         const chg = [ket ? `<span class="st st-disetujui">${esc(ket)}</span>` : "", p ? `<span class="st st-diajukan">Usulan ${p.jenis === "hapus" ? "hapus" : "ganti"} menunggu</span>` : ""].filter(Boolean).join("<br>");
         const aksi = canPropose(c) ? `<button class="mini" data-act="ganti" data-pw="${c}" data-kode="${esc(x.kode)}" ${p ? "disabled" : ""}>Ganti</button> <button class="mini r" data-act="hapus" data-pw="${c}" data-kode="${esc(x.kode)}" ${p ? "disabled" : ""}>Hapus</button>` : "";
-        return `<tr><td class="num">${x.no}</td>${aksiOn ? `<td style="white-space:nowrap">${aksi}</td>` : ""}<td>${esc(short(x.pw))}</td><td style="min-width:110px">${esc(title(x.kab))}</td><td class="num">${x.urut}</td><td><span class="badge ${view.category === '(4) Sudah beroperasi' && x.kat === KATS[1][0] ? 'bg4o' : currentCategoryStyle(view.category).cls}">${esc(view.category)}</span></td><td style="min-width:220px">${esc(x.nama)}</td><td>${esc(x.kec)}</td><td>${esc(x.desa)}</td><td style="white-space:nowrap">${esc(x.kode)}</td><td>${esc(x.nik)}</td><td style="min-width:260px;max-width:340px">${esc(view.reason)}</td><td class="sub" style="min-width:220px">${esc(view.evidence)}<details><summary>Pemilihan historis</summary>${esc(x.kat)}<br>${esc(x.alasan)}</details></td><td>${map}</td><td class="chg" style="min-width:150px">${chg || '<span class="z">–</span>'}</td></tr>`;
+        return `<tr><td class="num">${x.no}</td>${aksiOn ? `<td style="white-space:nowrap">${aksi}</td>` : ""}<td>${esc(short(x.pw))}</td><td style="min-width:110px">${esc(title(x.kab))}</td><td class="num">${x.urut}</td><td><span class="badge ${view.category === '(4) Sudah beroperasi' && x.kat === KATS[1][0] ? 'bg4o' : currentCategoryStyle(view.category).cls}">${esc(view.category)}</span></td><td style="min-width:220px">${esc(x.nama)}</td><td>${esc(x.kec)}</td><td>${esc(x.desa)}</td><td style="white-space:nowrap">${esc(x.kode)}</td><td>${esc(x.nik)}</td><td style="min-width:260px;max-width:340px">${esc(view.reason)}</td><td class="sub" style="min-width:220px">${esc(view.evidence)}<details><summary>Pemilihan historis</summary>${esc(x.kat)}<br>${esc(x.alasan)}</details></td><td>${map}</td><td style="white-space:nowrap"><button class="mini" type="button" data-act="detail" data-no="${esc(x.no)}" aria-label="Detail sarpras ${esc(x.nama)}">Detail</button></td><td class="chg" style="min-width:150px">${chg || '<span class="z">–</span>'}</td></tr>`;
       }).join("") + `</tbody>`;
   }
   $("#tblDaftar").addEventListener("click", (ev) => {
     const b = ev.target.closest("button[data-act]"); if (!b || b.disabled) return;
+    if (b.dataset.act === "detail") {
+      const x = EFF.all.find((r) => String(r.no) === String(b.dataset.no));
+      if (x) openSarpras(x);
+      return;
+    }
     const lama = (EFF.lists.get(b.dataset.pw) || []).find((x) => x.kode === b.dataset.kode); if (!lama) return;
     if (b.dataset.act === "ganti") openPicker(b.dataset.pw, lama); else openHapus(b.dataset.pw, lama);
   });
@@ -916,7 +1129,11 @@ function currentComposition(list, state) {
 
   // ---------------- dialog ----------------
   const dlg = $("#dlg");
-  const openDlg = (t, body, foot) => { $("#dlgTitle").textContent = t; $("#dlgBody").innerHTML = body; $("#dlgFoot").innerHTML = foot; if (!dlg.open) dlg.showModal(); };
+  const openDlg = (t, body, foot) => {
+    $("#dlgTitle").textContent = t;
+    if (typeof body === "string") $("#dlgBody").innerHTML = body; else $("#dlgBody").replaceChildren(body);
+    $("#dlgFoot").innerHTML = foot; if (!dlg.open) dlg.showModal();
+  };
   const closeDlg = () => dlg.open && dlg.close();
   $("#dlgX").addEventListener("click", closeDlg);
   const lokBox = (x, h, cls) => `<div class="box ${cls || ""}"><div class="h">${esc(h)}</div>${badge(x.kat)} <b>${esc(x.nama)}</b><div class="sub">${esc(x.desa)}, Kec. ${esc(x.kec)}, ${esc(title(x.kab))} · Kode desa ${esc(x.kode)}${x.nik ? " · NIK " + esc(x.nik) : ""}</div><div class="sub" style="color:var(--ink)">${esc(x.alasan)}</div></div>`;
@@ -1081,6 +1298,152 @@ function currentComposition(list, state) {
     $("#bYa").addEventListener("click", () => kirim($("#bYa"), () => updateDoc(doc(db, "usulan_tw4", s.id), { status: "dibatalkan", ditinjau_oleh: ME.email, ditinjau_nama: ME.nama, ditinjau_pada: serverTimestamp(), catatan: "Dibatalkan oleh Perwakilan pengusul" }), "Usulan dibatalkan."));
   }
   dlg.addEventListener("close", () => { PICK = null; });
+
+  // ---------------- popup detail sarpras per lokus ----------------
+  let SP = null;
+  const spEl = (tag, cls, text) => { const el = document.createElement(tag); if (cls) el.className = cls; if (text != null) el.textContent = text; return el; };
+  const spBox = (heading) => { const box = spEl("div", "box"); if (heading) box.append(spEl("div", "h", heading)); return box; };
+  const spText = (parent, label, value, cls = "sub") => {
+    const line = spEl("div", cls);
+    if (label != null) line.append(spEl("b", null, label + ": "));
+    line.append(document.createTextNode(value == null || value === "" ? "–" : String(value)));
+    parent.append(line);
+    return line;
+  };
+  const spStatusPill = (status) => {
+    const wrap = document.createElement("span");
+    const unverified = SARPAS_UNVERIFIED_STATUSES.includes(status);
+    const cls = SARPAS_DELIVERED_STATUSES.includes(status) ? "st st-disetujui" : unverified ? "st st-diajukan" : "st st-dibatalkan";
+    wrap.append(spEl("span", cls, status));
+    if (unverified) wrap.append(document.createTextNode(" · belum terverifikasi; bukan bukti tiba/terpasang"));
+    return wrap;
+  };
+  const spCell = (tr, value, cls) => { const td = spEl("td", cls); if (value && typeof value === "object" && typeof value.nodeType === "number") td.append(value); else td.append(document.createTextNode(value == null ? "–" : String(value))); tr.append(td); };
+  function spTable(cols, rows) {
+    const table = spEl("table"), thead = spEl("thead"), trhead = spEl("tr");
+    for (const c of cols) { const th = spEl("th", null, c); trhead.append(th); }
+    thead.append(trhead); table.append(thead);
+    const tbody = spEl("tbody");
+    for (const cells of rows) { const tr = spEl("tr"); for (const c of cells) spCell(tr, c.v, c.cls); tbody.append(tr); }
+    table.append(tbody);
+    return table;
+  }
+  function spSummaryBox(state) {
+    const box = spBox("Kondisi terkini dan bukti ringkasan sarpras historis");
+    spText(box, "Kondisi pembangunan", currentConditionText(state.lokus, CONDITIONS), "sub");
+    if (!CONDITIONS || CONDITIONS.loading) { box.append(spEl("p", "sub", "Memuat bukti ringkasan…")); return box; }
+    if (CONDITIONS.error || !CONDITIONS.index) { spText(box, "Bukti ringkasan", "Kondisi terbaru belum dapat dimuat; tanggal pembaruan populasi tetap tampil di bawah."); return box; }
+    const entry = currentConditionMatch(CONDITIONS.index, state.lokus);
+    if (!entry) { spText(box, "Bukti ringkasan", "Tidak ada padanan unik pada bukti kondisi terkini; bukan berarti kosong."); return box; }
+    const r = entry.row, items = r["Item sarpras tiba/terpasang"];
+    const n = items !== null && items !== undefined && items !== "" && typeof items !== "boolean" && Number.isFinite(Number(items)) ? Number(items) : null;
+    spText(box, "Item tiba/terpasang (ringkasan historis/parsial)", r.sarpras_unknown === true || n == null ? "belum diketahui" : fmt(n) + " item");
+    spText(box, "Tanggal sumber ringkasan", r.sarpras_source_date || "belum diketahui");
+    return box;
+  }
+  function spSections(state) {
+    const st = [], x = state.lokus, r = state.result || {};
+    const idb = spBox("Koperasi lokus uji petik");
+    const head = spEl("div"); head.append(spEl("b", null, x.nama || "(nama tidak tersedia)")); idb.append(head);
+    spText(idb, "Perwakilan", short(x.pw || ""));
+    spText(idb, "Lokasi", (x.desa ? "Desa/Kel. " + x.desa + ", " : "") + (x.kec ? "Kec. " + x.kec + ", " : "") + (x.kab ? title(x.kab) : ""));
+    spText(idb, "NIK Koperasi", x.nik);
+    spText(idb, "Kode Desa", x.kode);
+    if (r.row) spText(idb, "Portal ID", r.row.portal_id);
+    st.push(idb, spSummaryBox(state));
+    const foot = () => { st.push(spEl("p", "note", snapshotUpdatedText(r.man) + ". Sarpras historis/parsial; data yang belum diketahui bukan berarti nol. Bukan verifikasi lapangan.")); return st; };
+    if (!r.phase) { const box = spBox("Detail per item sarpras"); box.append(spEl("p", "sub", "Memuat detail sarpras…")); box.setAttribute("role", "status"); st.push(box); return st; }
+    if (r.phase === "error") {
+      const box = spBox("Detail per item sarpras belum dapat ditampilkan");
+      box.append(spEl("p", "msg bad", r.err || "Gagal memuat."));
+      st.push(box); return foot();
+    }
+    if (r.phase === "legacy" || r.phase === "absent") {
+      const box = spBox("Detail per item sarpras");
+      spText(box, "Status", r.phase === "absent"
+        ? "Snapshot ini belum menerbitkan dataset detail per item; bukan berarti kosong."
+        : "Snapshot ini memakai format detail lawas; detail per item tidak dibuka pada tampilan ini.");
+      spText(box, "Keterangan", "Ringkasan sarpras historis/parsial pada kotak di atas tetap berlaku; perlu verifikasi lapangan.");
+      st.push(box); return foot();
+    }
+    if (r.phase === "identity") {
+      const box = spBox("Detail per item sarpras");
+      spText(box, "Status", r.reason);
+      st.push(box); return foot();
+    }
+    if (r.phase !== "done") return st;
+    const sb = spBox("Status sumber detail");
+    spText(sb, "Status pembangunan", r.row["Status pembangunan"]);
+    spText(sb, "Keadaan sumber", SARPAS_STATE_TEXT[r.row.sarpras_state] || r.row.sarpras_state || "belum diketahui");
+    if (r.row.stale === true) spText(sb, "Retensi", "Record dipertahankan historis (stale); bukan kondisi terkini.");
+    spText(sb, "Keterangan celah sumber", r.row.sarpras_gap_reason ? (SARPAS_GAP_TEXT[r.row.sarpras_gap_reason] || r.row.sarpras_gap_reason) : "–");
+    st.push(sb);
+    const ib = spBox("Butir sarpras (bukti per item)");
+    spText(ib, "Ringkasan hitungan", sarprasDeliveryText(r.delivery, !!r.detail.items));
+    if (r.detail.items) {
+      const cat = r.detail.catalog;
+      const byId = new Map((cat || []).filter(it => it && typeof it === "object").map(it => [it.id, it]));
+      const ids = Object.keys(r.detail.items);
+      const cols = cat ? ["Item", "Kelompok", "Prioritas", "Unit per paket", "Status", "Vendor", "Jumlah paket", "Catatan"] : ["ID item", "Status", "Vendor", "Jumlah paket", "Catatan"];
+      const cells = id => {
+        const it = byId.get(id) || {}, rec = r.detail.items[id] || {};
+        const num = v => v == null || typeof v !== "number" ? "–" : fmt(v);
+        const statusCell = rec.status ? spStatusPill(rec.status) : "belum diketahui";
+        return cat
+          ? [{ v: it.name || id }, { v: it.group || "–" }, { v: it.priority || "–" }, { v: num(it.jumlah_unit_per_paket) },
+             { v: statusCell }, { v: rec.vendor || "–" }, { v: num(rec.jumlah_paket) }, { v: rec.catatan || "–" }]
+          : [{ v: id }, { v: statusCell }, { v: rec.vendor || "–" }, { v: num(rec.jumlah_paket) }, { v: rec.catatan || "–" }];
+      };
+      const rows = cat ? sarprasCatalogSorted(cat).map(it => cells(it.id)) : ids.sort().map(cells);
+      const wrap = spEl("div", "tablewrap");
+      wrap.append(spTable(cols, rows));
+      spText(ib, "Katalog", cat ? "Katalog item terpin pada snapshot ini (identitas historis terjaga)." : "Katalog tidak tercantum pada sel detail; item tampil apa adanya.");
+      ib.append(wrap);
+    }
+    st.push(ib);
+    const pb = spBox("Provenans bukti per item");
+    const prov = r.detail.provenance && typeof r.detail.provenance === "object" ? r.detail.provenance : {};
+    spText(pb, "Cara perolehan detail", prov.observation === "fetched" ? "Langsung diambil dari portal (fetched) saat snapshot" : prov.observation === "cached" ? "Pakai ulang cache historis; tanggal sumber asli dipertahankan" : "Tidak diketahui");
+    spText(pb, "Tanggal laporan vendor terakhir (sumber asli)", prov.latest_report_at);
+    spText(pb, "Tanggal laporan terakhir ter-review (sumber asli)", prov.last_reviewed_report);
+    spText(pb, "Tanggal pengambilan bukti (sumber asli)", prov.fetched_at_utc);
+    spText(pb, "Tanggal sumber ringkasan (baris sumber)", r.row.sarpras_source_date);
+    spText(pb, "Tanggal bukti terkini diambil (baris sumber)", r.row.sarpras_fresh_fetched_at);
+    spText(pb, "Sumber data baris", r.row.sarpras_source);
+    const sem = r.detail.semantics && typeof r.detail.semantics === "object" ? r.detail.semantics : {};
+    if (Array.isArray(sem.unverified_statuses) && sem.unverified_statuses.length) spText(pb, "Status belum terverifikasi", sem.unverified_statuses.join(", "));
+    const unc = prov.uncertainty && typeof prov.uncertainty === "object" ? prov.uncertainty : {};
+    if (unc.fetch_provenance_unknown === true) spText(pb, "Provenans pengambilan", "Tidak tercatat pada bukti; tidak diganti dengan waktu build.");
+    if (unc.latest_report_at_unknown === true) spText(pb, "Tanggal laporan vendor", "Tidak tercatat.");
+    if (unc.unverified_statuses && Array.isArray(unc.unverified_statuses) && unc.unverified_statuses.length) spText(pb, "Semantik status", "Status berikut tidak dihitung tiba/terpasang: " + unc.unverified_statuses.join(", "));
+    if (unc.inventory_completeness) spText(pb, "Kelengkapan inventaris", String(unc.inventory_completeness) + "; bukan klaim lengkap.");
+    st.push(pb);
+    return foot();
+  }
+  function spRender(state) {
+    if (!state.alive || !state.alive()) return;
+    const body = document.getElementById("spBody");
+    if (body) body.replaceChildren(...spSections(state));
+  }
+  async function spLoad(state) {
+    state.result = await sarprasResolveDetail(state.reader, state.scope, state.lokus, window.crypto && window.crypto.subtle, TextEncoder);
+    spRender(state);
+  }
+  function openSarpras(lokus) {
+    if (!READER || !ME || !lokus) return;
+    const session = SESSION, reader = READER;
+    const scope = sarprasScope(ME);
+    if (!scope) return;
+    const state = SP = { lokus, session, reader, scope };
+    state.alive = () => !!ME && !sarprasPopupStale(state, { me: ME, session: SESSION, reader: READER, dlgOpen: dlg.open }) && SP === state;
+    const body = spEl("div"); body.id = "spBody";
+    body.replaceChildren(...spSections(state));
+    openDlg(`Detail sarpras · ${(lokus.nama || lokus.kode || "").slice(0, 80)}`, body,
+      `<span class="msg" id="spMsg"></span><button class="btn btn-ghost" type="button" id="spTutup">Tutup</button>`);
+    $("#spTutup").addEventListener("click", closeDlg);
+    spLoad(state).catch(() => { if (state.alive()) { state.result = { phase: "error", err: "Gagal memuat detail sarpras." }; spRender(state); } });
+  }
+
 })();
 </script>
 </body>
