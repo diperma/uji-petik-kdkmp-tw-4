@@ -109,7 +109,6 @@ footer{max-width:1360px;margin:0 auto;padding:8px 16px 24px;color:var(--mute);fo
 .komp b{font-size:14px}
 .komp .sep{width:1px;align-self:stretch;background:var(--line)}
 .komp .chip{padding:3px 9px;border-radius:999px;background:var(--alt);white-space:nowrap}
-.komp .chip.full{background:#F7E3E3;color:var(--red)}
 .komp .grow{flex:1}
 
 /* dialog */
@@ -195,7 +194,7 @@ input.combo-in:focus{cursor:text;outline:2px solid var(--blue);outline-offset:0;
       <div class="legend">Empat kelompok uji petik mengikuti kondisi pembangunan terbaru dan bukti operasi historis (bukan verifikasi operasi terkini). Gedung terbangun tidak menyatakan sarpras lengkap. Belum memiliki lahan bersumber dari rekonstruksi dan perlu verifikasi; lokasi di luar empat kelompok ditandai Perlu verifikasi.</div>
       <div class="tablewrap"><table id="tblRing"></table></div>
       <p class="note">Klik baris untuk membuka daftar lokasi Perwakilan tersebut. Angka lokasi sudah memperhitungkan usulan perubahan yang disetujui D302. Kategori dan jumlah mengikuti kondisi snapshot terkini, termasuk yang belum terverifikasi atau masih dimuat. Ketentuan pemilihan historis berikut tetap dipakai untuk batas dan persetujuan usulan, bukan penetapan kondisi terkini.
-      Maksimal 10 lokasi per Perwakilan; KDKMP belum memiliki lahan maksimal 3, kecuali Perwakilan Maluku, Maluku Utara, dan seluruh wilayah Papua yang tidak dibatasi jumlah kategori belum memiliki lahan (total tetap maksimal 10 lokasi). Komposisi awal wilayah tanpa KDKMP beroperasi: 4 mandek, 3 terbangun dengan kelengkapan, 3 belum memiliki lahan. Wilayah dengan KDKMP beroperasi: beroperasi didahulukan (seluruh 84 titik prioritas yang belum pernah diuji petik BPKP, minimal 3), lalu 3 mandek, 2 terbangun, 2 belum lahan; Jawa Tengah, DIY, dan Jawa Timur tetap 10 KDKMP beroperasi. Bila kategori di kab/kota lokus kurang, diisi mandek dari kab/kota lain di wilayah kerja yang sama. KDKMP sampel TW II/TW III tidak diambil ulang. Wilayah kerja sesuai Peraturan BPKP Nomor 5 Tahun 2026.</p>
+      Jumlah lokasi uji petik per Perwakilan tidak dibatasi. KDKMP belum memiliki lahan maksimal 3, kecuali Perwakilan Maluku, Maluku Utara, dan seluruh wilayah Papua yang tidak dibatasi jumlah kategori belum memiliki lahan. Komposisi awal wilayah tanpa KDKMP beroperasi: 4 mandek, 3 terbangun dengan kelengkapan, 3 belum memiliki lahan. Wilayah dengan KDKMP beroperasi: beroperasi didahulukan (seluruh 84 titik prioritas yang belum pernah diuji petik BPKP, minimal 3), lalu 3 mandek, 2 terbangun, 2 belum lahan; komposisi awal Jawa Tengah, DIY, dan Jawa Timur adalah 10 KDKMP beroperasi, bukan batas jumlah lokasi. Bila kategori di kab/kota lokus kurang, diisi mandek dari kab/kota lain di wilayah kerja yang sama. KDKMP sampel TW II/TW III tidak diambil ulang. Wilayah kerja sesuai Peraturan BPKP Nomor 5 Tahun 2026.</p>
     </section>
 
     <section id="v-daftar" role="tabpanel" aria-labelledby="t-daftar" class="hidden">
@@ -221,7 +220,7 @@ input.combo-in:focus{cursor:text;outline:2px solid var(--blue);outline-offset:0;
       </div>
       <div class="count" id="uCount"></div>
       <div class="tablewrap"><table id="tblUsul"></table></div>
-      <p class="note">Alur: Perwakilan mengusulkan penggantian, penghapusan, atau penambahan lokasi dengan KDKMP dari populasi BNBA wilayah kerjanya → D302 meninjau → usulan yang disetujui langsung mengubah daftar lokasi. Batas tetap berlaku saat pengajuan dan persetujuan: maksimal 10 lokasi per Perwakilan dan maksimal 3 KDKMP belum memiliki lahan. Khusus Perwakilan Maluku, Maluku Utara, dan seluruh wilayah Papua, batas 3 KDKMP belum memiliki lahan tidak berlaku; total tetap maksimal 10 lokasi. Usulan tidak dapat dihapus; usulan yang masih menunggu dapat dibatalkan oleh Perwakilan pengusul.</p>
+      <p class="note">Alur: Perwakilan mengusulkan penggantian, penghapusan, atau penambahan lokasi dengan KDKMP dari populasi BNBA wilayah kerjanya → D302 meninjau → usulan yang disetujui langsung mengubah daftar lokasi. Jumlah lokasi per Perwakilan tidak dibatasi, baik saat pengajuan maupun persetujuan. Batas maksimal 3 KDKMP belum memiliki lahan tetap berlaku, kecuali untuk Perwakilan Maluku, Maluku Utara, dan seluruh wilayah Papua. Usulan tidak dapat dihapus; usulan yang masih menunggu dapat dibatalkan oleh Perwakilan pengusul.</p>
     </section>
   </main>
   <footer id="foot"></footer>
@@ -363,7 +362,7 @@ import { getFirestore, doc, getDoc, collection, query, where, onSnapshot, addDoc
     "Papua Barat Daya", "Papua Tengah"];
   const pwName = (code) => "Perwakilan BPKP " + NAMES[Number(code.slice(1)) - 1];
   const pwCode = (name) => "P" + String(NAMES.indexOf(String(name).replace("Perwakilan BPKP ", "")) + 1).padStart(2, "0");
-  const MAXN = 10, MAX_LAHAN = 3;
+  const MAX_LAHAN = 3;
 
   let DATA = null, ME = null, USUL = [], EFF = null, unsub = null, started = false;
 // VERSIONED_READER_BEGIN
@@ -927,7 +926,6 @@ function sarprasPopupStale(state, now) {
   const tanpaBatasLahan = (code) => /^(?:Perwakilan BPKP )?(?:Maluku(?: Utara)?|Papua(?: .+)?)$/.test(pwName(code));
   function batasErr(list, code) {
     const c = komposisi(list);
-    if (c.n > MAXN) return `jumlah lokasi menjadi ${c.n}, melebihi batas ${MAXN} per Perwakilan`;
     if (!tanpaBatasLahan(code) && c.k3 > MAX_LAHAN) return `KDKMP belum memiliki lahan menjadi ${c.k3}, melebihi batas ${MAX_LAHAN}`;
     return "";
   }
@@ -1037,12 +1035,11 @@ function sarprasPopupStale(state, now) {
     // panel komposisi + tombol tambah untuk Perwakilan terpilih
     if (code && canPropose(code)) {
       const list = EFF.lists.get(code) || [], counts = currentComposition(list, CONDITIONS), pj = komposisi(proyeksi(code)), np = pending(code).length;
-      const full = pj.n >= MAXN;
       $("#komp").innerHTML = `<b>${esc(short(selPw))}</b><span class="sep"></span>
-        <span class="chip ${list.length >= MAXN ? "full" : ""}">${list.length}/${MAXN} lokasi</span>${visibleCurrentCategories(counts).map(category => `<span class="chip ${currentCategoryStyle(category).cls}">${esc(category)}: ${counts[category]}</span>`).join('')}
+        <span class="chip">${list.length} lokasi · tanpa batas jumlah</span>${visibleCurrentCategories(counts).map(category => `<span class="chip ${currentCategoryStyle(category).cls}">${esc(category)}: ${counts[category]}</span>`).join('')}
         <span class="sub">Kategori terkini; batas/persetujuan usulan tetap memakai kategori pemilihan historis${tanpaBatasLahan(code) ? ' (tanpa batas kategori lahan)' : ' (maks. 3 kategori lahan)'}.</span>
         ${np ? `<span class="sep"></span><span class="sub">${np} usulan menunggu · proyeksi batas historis jika disetujui: ${pj.n} lokasi, kategori lahan historis ${pj.k3}</span>` : ""}
-        <span class="grow"></span><button class="btn btn-navy" id="btnTambah" type="button" ${full ? "disabled" : ""} title="${full ? "Daftar (termasuk usulan menunggu) sudah 10 lokasi; usulkan ganti atau hapus" : ""}">+ Usulkan tambah lokasi</button>`;
+        <span class="grow"></span><button class="btn btn-navy" id="btnTambah" type="button">+ Usulkan tambah lokasi</button>`;
       $("#komp").classList.remove("hidden");
       $("#btnTambah").addEventListener("click", () => openPicker(code, null));
     } else $("#komp").classList.add("hidden");
