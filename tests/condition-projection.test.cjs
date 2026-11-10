@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+const scopeHelpers = html.slice(html.indexOf('// PW codes are exactly P01'), html.indexOf('const sarprasObj ='));
 const columns = ['kind', 'NIK Koperasi (master)', 'NIK Koperasi', 'Kode Desa', 'stale', 'Status pembangunan', 'Progres terbaru (%)', '(2) Mandek > 3 bulan', 'Hari sejak dibuat', 'Hari lewat target', 'Item sarpras tiba/terpasang', 'sarpras_unknown', 'sarpras_source_date'];
 const ctx = vm.createContext({ Intl, Date });
 vm.runInContext(html.slice(html.indexOf('function snapshotUpdatedText('), html.indexOf('// Latest progress')), ctx);
@@ -63,11 +64,11 @@ function loader(man, data = project({ gerai: [{ 'NIK Koperasi': '123' }], belum_
     reader: { pin: async (...args) => { calls.push(['pin', ...args]); return { man }; }, dataset: async (...args) => { calls.push(args); if (data instanceof Error) throw data; return data; } },
     refresh: () => calls.push(['refresh']), me,
   });
-  vm.runInContext('let CONDITIONS = null, SESSION = 1, READER = reader, ME = me;\n' + loaderCode, context);
+  vm.runInContext(scopeHelpers + 'let CONDITIONS = null, SESSION = 1, READER = reader, ME = me;\n' + loaderCode, context);
   return { calls, context, state: () => vm.runInContext('CONDITIONS', context) };
 }
 test('advertised compact loader fetches only kondisi in authorized scope, cached for session', async () => {
-  for (const [me, scope] of [[{ role: 'D302' }, ['populasi_tw4', '']], [{ role: 'PW', pw: 'P10' }, ['populasi_pw', 'P10_']]]) {
+  for (const [me, scope] of [[{ role: 'D302' }, ['populasi_tw4', '']], [{ role: 'NATIONAL_VIEWER', pw: 'P10' }, ['populasi_tw4', '']], [{ role: 'PW', pw: 'P10' }, ['populasi_pw', 'P10_']]]) {
     const fixture = loader({ datasets: { kondisi: { projection_version: 1 } } }, undefined, me);
     vm.runInContext('loadCurrentConditions(); loadCurrentConditions();', fixture.context);
     await settle();

@@ -650,11 +650,18 @@ async function sarprasPortalDigest(text, subtle, Encoder = TextEncoder) {
 function sarprasShardIndex(digest) {
   return digest && digest.length ? (digest[0] & 255) % 8 : -1;
 }
+// PW codes are exactly P01–P36 (Lampiran II Peraturan BPKP No. 5/2026); 'ALL' or any other value is refused.
+function isValidPwCode(pw) { return typeof pw === "string" && /^P(?:0[1-9]|1[0-9]|2[0-9]|3[0-6])$/.test(pw); }
+// National read access: D302 and the read-only NATIONAL_VIEWER. Never grants mutation rights.
+function canReadNational(me) { return !!me && (me.role === "D302" || me.role === "NATIONAL_VIEWER"); }
+function nationalReadScope(me) { return canReadNational(me) ? ["populasi_tw4", ""] : null; }
+// Supported roles: D302, NATIONAL_VIEWER, or PW with a valid P01–P36 code. Anything else fails closed.
+function isSupportedRole(me) { return !!me && (canReadNational(me) || (me.role === "PW" && isValidPwCode(me.pw))); }
 function sarprasScope(me) {
   if (!me) return null;
-  if (me.role === "D302") return ["populasi_tw4", ""];
-  // PW codes are exactly P01–P36 (Lampiran II Peraturan BPKP No. 5/2026); 'ALL' or any other value is refused.
-  if (me.role === "PW" && typeof me.pw === "string" && /^P(?:0[1-9]|1[0-9]|2[0-9]|3[0-6])$/.test(me.pw)) return ["populasi_pw", me.pw + "_"];
+  const national = nationalReadScope(me);
+  if (national) return national;
+  if (me.role === "PW" && isValidPwCode(me.pw)) return ["populasi_pw", me.pw + "_"];
   return null; // Never fall back from a PW account to the national scope.
 }
 const sarprasObj = (cols, values) => {
@@ -802,7 +809,8 @@ function sarprasPopupStale(state, now) {
     // One scope per session, independent of candidate eligibility and table renders.
     if (CONDITIONS || !READER || !ME) return;
     const session = SESSION, reader = READER;
-    const scope = ME.role === 'D302' ? ['populasi_tw4', ''] : ['populasi_pw', ME.pw + '_'];
+    const scope = sarprasScope(ME);
+    if (!scope) return;
     const state = CONDITIONS = { loading: true, man: null };
     const alive = () => session === SESSION && reader === READER && CONDITIONS === state;
     (async () => {
@@ -869,23 +877,26 @@ function sarprasPopupStale(state, now) {
       if (!current()) return;
       if (!ak.exists()) { setErr(`Akun ${u.email} belum terdaftar untuk aplikasi ini. Akses diberikan kepada pegawai D302 dan pegawai Perwakilan BPKP sesuai daftar pegawai; hubungi Tim APP KDKMP (D302) bila perlu akses.`); await signOut(auth); return; }
       const A = ak.data();
-      ME = { email: u.email.toLowerCase(), role: A.role, pw: A.pw, nama: A.nama || "", unit: A.unit || "" };
-      const snap = await getDoc(doc(db, "lokus_tw4", ME.role === "D302" ? "data" : "pw_" + ME.pw));
+      const candidate = { email: u.email.toLowerCase(), role: A.role, pw: A.pw, nama: A.nama || "", unit: A.unit || "" };
+      // Validate the role before any dataset read; unknown roles and invalid PW codes fail closed.
+      if (!isSupportedRole(candidate)) throw new Error("Peran akun tidak dikenali atau kode Perwakilan tidak valid.");
+      ME = candidate;
+      const snap = await getDoc(doc(db, "lokus_tw4", canReadNational(ME) ? "data" : "pw_" + ME.pw));
       if (!current()) return;
       if (!snap.exists()) throw new Error("Data belum tersedia.");
       DATA = JSON.parse(snap.data().json);
-      DATA.unit = ME.role === "D302" ? "D302 · semua Perwakilan" : ME.unit;
+      DATA.unit = ME.role === "D302" ? "D302 · semua Perwakilan" : ME.role === "NATIONAL_VIEWER" ? "Nasional · baca-saja" : ME.unit;
       $("#who").textContent = `${u.email} · ${DATA.unit}`;
       READER = createSnapshotReader(async (col, id) => { const s = await getDoc(doc(db, col, id)); return s.exists() ? s.data() : null; }, current);
       USUL = []; start(); loadCurrentConditions();
       const metadataReader = READER;
-      const metadataScope = ME.role === "D302" ? ["populasi_tw4", ""] : ["populasi_pw", ME.pw + "_"];
+      const metadataScope = sarprasScope(ME);
       metadataReader.pin(...metadataScope).then((pinned) => {
         if (current() && READER === metadataReader) $("#meta").textContent = `${DATA.pw_nama || "Lokus per Perwakilan BPKP"} · ${snapshotUpdatedText(pinned.man)} (populasi kandidat)`;
       }).catch(() => {
         if (current() && READER === metadataReader) $("#meta").textContent = `${DATA.pw_nama || "Lokus per Perwakilan BPKP"} · Waktu pembaruan populasi belum dapat dimuat`;
       });
-      const q = ME.role === "D302" ? collection(db, "usulan_tw4") : query(collection(db, "usulan_tw4"), where("pw", "==", ME.pw));
+      const q = canReadNational(ME) ? collection(db, "usulan_tw4") : query(collection(db, "usulan_tw4"), where("pw", "==", ME.pw));
       unsub = onSnapshot(q, (s) => { if (!current()) return; USUL = s.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) })); refresh(); },
         (e) => { if (current()) toast("Gagal memuat usulan: " + (e.code || e.message), true); });
     } catch (e) {
@@ -912,7 +923,7 @@ function sarprasPopupStale(state, now) {
   const tgl = (v) => (v && v.toDate ? v.toDate().toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "–");
   const JENIS = { tambah: "Tambah", hapus: "Hapus", ganti: "Ganti" };
   const STATUS = { diajukan: "Menunggu persetujuan", disetujui: "Disetujui", ditolak: "Ditolak", dibatalkan: "Dibatalkan" };
-  const canPropose = (code) => !!ME && (ME.role === "D302" || ME.pw === code);
+  const canPropose = (code) => !!ME && (ME.role === "D302" || (ME.role === "PW" && isValidPwCode(ME.pw) && ME.pw === code));
 
   let toastT = 0;
   function toast(m, bad) { const t = $("#toast"); t.textContent = m; t.classList.toggle("bad", !!bad); t.classList.remove("hidden"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.add("hidden"), bad ? 7000 : 4000); }
@@ -980,10 +991,12 @@ function sarprasPopupStale(state, now) {
     $("#fPw").innerHTML = (R.length > 1 ? `<option value="">Semua Perwakilan (${R.length})</option>` : "") + R.map((r) => `<option value="${esc(r.pw)}">${r.no}. ${esc(short(r.pw))}</option>`).join("");
     $("#fKat").innerHTML = `<option value="">Semua kategori</option>`;
     $("#uPw").innerHTML = `<option value="">Semua Perwakilan</option>` + R.map((r) => `<option value="${pwCode(r.pw)}">${r.no}. ${esc(short(r.pw))}</option>`).join("");
-    $("#uPwWrap").classList.toggle("hidden", ME.role !== "D302");
+    $("#uPwWrap").classList.toggle("hidden", !canReadNational(ME));
     $("#uSt").value = ME.role === "D302" ? "diajukan" : "";
     $("#daftarNote").textContent = ME.role === "D302"
       ? "D302 dapat meninjau usulan pada tab Usulan Perubahan, dan dapat mengusulkan perubahan untuk Perwakilan yang dipilih. Kolom Perubahan menandai lokasi hasil usulan yang disetujui."
+      : ME.role === "NATIONAL_VIEWER"
+      ? "Akses nasional baca-saja: Anda dapat melihat daftar lokasi, usulan, dan kondisi terkini seluruh Perwakilan, tetapi tidak dapat mengusulkan, mengubah, menghapus, membatalkan, atau meninjau usulan."
       : "Pilihan yang sudah disetujui tetap dapat diubah: gunakan Ganti/Hapus di daftar ini atau Usulkan perubahan lagi pada tab Usulan Perubahan. Perubahan diajukan sebagai usulan baru; pilihan saat ini tetap berlaku sampai disetujui D302. Pilihan pengganti/tambahan bersumber dari populasi BNBA wilayah kerja Perwakilan.";
     if (!started) { show(location.hash === "#usulan" ? "usul" : "ring"); started = true; }   // tautan email notifikasi: …/#usulan
     refresh();
@@ -1097,7 +1110,7 @@ function sarprasPopupStale(state, now) {
       rows.map((s) => {
         let aksi = "";
         if (s.status === "diajukan" && ME.role === "D302") aksi = `<button class="mini" data-uact="tinjau" data-id="${s.id}">Tinjau</button>`;
-        else if (s.status === "diajukan" && ME.pw === s.pw) aksi = `<button class="mini r" data-uact="batal" data-id="${s.id}">Batalkan</button>`;
+        else if (s.status === "diajukan" && ME.role === "PW" && ME.pw === s.pw) aksi = `<button class="mini r" data-uact="batal" data-id="${s.id}">Batalkan</button>`;
         else if (s.status === "disetujui" && canPropose(s.pw)) {
           const lokasi = lokasiDisetujui(s);
           const terkunci = lokasi && kodeTerkunci(s.pw).has(lokasi.kode);
@@ -1144,12 +1157,17 @@ function sarprasPopupStale(state, now) {
     try { await fn(); closeDlg(); toast(okMsg); }
     catch (e) { btn.disabled = false; btn.textContent = old; toast("Gagal menyimpan: " + (e.code === "permission-denied" ? "ditolak oleh aturan akses (periksa status usulan atau hak akses)" : (e.message || e)), true); }
   }
-  const usulBaru = (code, jenis, lama, baru, alasan) => addDoc(collection(db, "usulan_tw4"), {
-    pw: code, jenis, lama: lama ? bersih(lama) : null, baru: baru ? bersih(baru) : null, alasan: S(alasan, 1000),
-    status: "diajukan", dibuat_oleh: ME.email, dibuat_nama: ME.nama, dibuat_pada: serverTimestamp() });
+  const usulBaru = async (code, jenis, lama, baru, alasan) => {
+    // Checked at invocation so a role change after the dialog opened cannot mutate.
+    if (!canPropose(code)) throw new Error("Tidak berwenang mengajukan usulan untuk Perwakilan ini.");
+    return addDoc(collection(db, "usulan_tw4"), {
+      pw: code, jenis, lama: lama ? bersih(lama) : null, baru: baru ? bersih(baru) : null, alasan: S(alasan, 1000),
+      status: "diajukan", dibuat_oleh: ME.email, dibuat_nama: ME.nama, dibuat_pada: serverTimestamp() });
+  };
 
   // ---- hapus
   function openHapus(code, lama) {
+    if (!canPropose(code)) { toast("Akun ini tidak dapat mengajukan usulan.", true); return; }
     const after = applyOne(proyeksi(code), { jenis: "hapus", lama, baru: null, pw: code });
     openDlg(`Usulkan hapus lokasi · ${short(pwName(code))}`,
       `${lokBox(lama, "Lokasi yang diusulkan dihapus")}
@@ -1207,6 +1225,7 @@ function sarprasPopupStale(state, now) {
 
   let PICK = null;
   async function openPicker(code, lama) {
+    if (!canPropose(code)) { toast("Akun ini tidak dapat mengajukan usulan.", true); return; }
     const session = SESSION;
     const jenis = lama ? "ganti" : "tambah";
     PICK = { code, lama, jenis, sel: null, list: null };
@@ -1274,6 +1293,7 @@ function sarprasPopupStale(state, now) {
 
   // ---- tinjau (D302) dan batalkan (Perwakilan)
   function openTinjau(s) {
+    if (!ME || ME.role !== "D302" || !s || s.status !== "diajukan") { toast("Hanya D302 yang dapat meninjau usulan yang menunggu persetujuan.", true); return; }
     const l = EFF.lists.get(s.pw) || [], r = applyOne(l, s);
     openDlg(`Tinjau usulan ${JENIS[s.jenis].toLowerCase()} · ${short(pwName(s.pw))}`,
       `<div class="${s.lama && s.baru ? "two" : ""}">${s.lama ? lokBox(s.lama, s.jenis === "hapus" ? "Lokasi yang diusulkan dihapus" : "Lokasi semula") : ""}${s.baru ? lokBox(s.baru, s.jenis === "tambah" ? "Lokasi tambahan" : "Lokasi pengganti", "sel") : ""}</div>
@@ -1281,7 +1301,12 @@ function sarprasPopupStale(state, now) {
        <p class="sub" style="margin:10px 0 0">Daftar saat ini: ${kompTeks(l)}${r.list ? ` → setelah disetujui: <b>${kompTeks(r.list)}</b>` : ""}</p>
        <label for="tCat">Catatan peninjauan (wajib bila menolak)</label><textarea id="tCat" maxlength="1000"></textarea>`,
       `<span class="msg bad" id="tMsg">${r.err ? "Tidak dapat disetujui: " + esc(r.err) : ""}</span><button class="btn btn-red" type="button" id="tTolak">Tolak</button><button class="btn btn-ok" type="button" id="tSetuju" ${r.err ? "disabled" : ""}>Setujui</button>`);
-    const upd = (status) => updateDoc(doc(db, "usulan_tw4", s.id), { status, ditinjau_oleh: ME.email, ditinjau_nama: ME.nama, ditinjau_pada: serverTimestamp(), catatan: S($("#tCat").value, 1000) });
+    const upd = async (status) => {
+      // Re-check role and current proposal status at invocation (dialog may be stale).
+      const now = USUL.find((x) => x.id === s.id);
+      if (!ME || ME.role !== "D302" || !now || now.status !== "diajukan" || (status !== "disetujui" && status !== "ditolak")) throw new Error("Tidak berwenang meninjau usulan ini.");
+      return updateDoc(doc(db, "usulan_tw4", s.id), { status, ditinjau_oleh: ME.email, ditinjau_nama: ME.nama, ditinjau_pada: serverTimestamp(), catatan: S($("#tCat").value, 1000) });
+    };
     $("#tSetuju").addEventListener("click", () => kirim($("#tSetuju"), () => upd("disetujui"), "Usulan disetujui; daftar lokasi diperbarui."));
     $("#tTolak").addEventListener("click", () => {
       if ($("#tCat").value.trim().length < 5) { $("#tMsg").textContent = "Isi catatan alasan penolakan (minimal 5 karakter)."; $("#tCat").focus(); return; }
@@ -1289,10 +1314,19 @@ function sarprasPopupStale(state, now) {
     });
   }
   function openBatal(s) {
+    // PW cancels only its own pending proposal; D302 and NATIONAL_VIEWER never cancel.
+    const bolehBatal = () => {
+      const now = s && USUL.find((x) => x.id === s.id);
+      return !!ME && ME.role === "PW" && isValidPwCode(ME.pw) && !!now && now.pw === ME.pw && now.status === "diajukan";
+    };
+    if (!bolehBatal()) { toast("Hanya Perwakilan pengusul yang dapat membatalkan usulannya yang masih menunggu.", true); return; }
     openDlg("Batalkan usulan", `<p style="margin-top:0">Batalkan usulan <b>${JENIS[s.jenis].toLowerCase()}</b> berikut? Usulan yang dibatalkan tetap tercatat di riwayat.</p><div class="${s.lama && s.baru ? "two" : ""}">${s.lama ? lokBox(s.lama, "Lokasi semula") : ""}${s.baru ? lokBox(s.baru, "Lokasi usulan", "sel") : ""}</div>`,
       `<button class="btn btn-ghost" type="button" id="bTidak">Tidak</button><button class="btn btn-red" type="button" id="bYa">Batalkan usulan</button>`);
     $("#bTidak").addEventListener("click", closeDlg);
-    $("#bYa").addEventListener("click", () => kirim($("#bYa"), () => updateDoc(doc(db, "usulan_tw4", s.id), { status: "dibatalkan", ditinjau_oleh: ME.email, ditinjau_nama: ME.nama, ditinjau_pada: serverTimestamp(), catatan: "Dibatalkan oleh Perwakilan pengusul" }), "Usulan dibatalkan."));
+    $("#bYa").addEventListener("click", () => kirim($("#bYa"), async () => {
+      if (!bolehBatal()) throw new Error("Tidak berwenang membatalkan usulan ini.");
+      return updateDoc(doc(db, "usulan_tw4", s.id), { status: "dibatalkan", ditinjau_oleh: ME.email, ditinjau_nama: ME.nama, ditinjau_pada: serverTimestamp(), catatan: "Dibatalkan oleh Perwakilan pengusul" });
+    }, "Usulan dibatalkan."));
   }
   dlg.addEventListener("close", () => { PICK = null; });
 

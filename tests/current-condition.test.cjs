@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+const scopeHelpers = html.slice(html.indexOf('// PW codes are exactly P01'), html.indexOf('const sarprasObj ='));
 const context = vm.createContext({ Intl, Date });
 vm.runInContext(html.slice(html.indexOf('function snapshotUpdatedText('), html.indexOf('// Latest progress')), context);
 vm.runInContext(html.split('// CURRENT_CONDITION_BEGIN')[1].split('// CURRENT_CONDITION_END')[0], context);
@@ -76,7 +77,7 @@ test('legacy loader is cached per session, guarded, and reads three tables only 
     reader: { pin: () => new Promise(resolve => deferred.push(resolve)), dataset: async (...args) => { calls.push(args); return dataset([row()]); } },
   });
   const loader = html.slice(html.indexOf('  function loadCurrentConditions()'), html.indexOf('  function resetReader()'));
-  vm.runInContext('let CONDITIONS = null, SESSION = 1, READER = reader, ME = { role: "D302" };\n' + loader, loaderContext);
+  vm.runInContext(scopeHelpers + 'let CONDITIONS = null, SESSION = 1, READER = reader, ME = { role: "D302" };\n' + loader, loaderContext);
   vm.runInContext('loadCurrentConditions(); loadCurrentConditions();', loaderContext);
   assert.equal(deferred.length, 1);
   deferred.shift()({ man: {} });
