@@ -1223,6 +1223,12 @@ function sarprasPopupStale(state, now) {
     return KAND[key];
   }
 
+  // Selection is blocked only by current TW IV membership or a pending proposal,
+  // never by historical candidate metadata such as a TW II/III `blok` field.
+  function candidateBlockReason(code, kode) {
+    if ((EFF.lists.get(code) || []).some(x => x.kode === kode)) return "Sudah ada di daftar lokasi";
+    return kodeTerkunci(code).has(kode) ? "Sedang dalam usulan lain" : "";
+  }
   let PICK = null;
   async function openPicker(code, lama) {
     if (!canPropose(code)) { toast("Akun ini tidak dapat mengajukan usulan.", true); return; }
@@ -1237,6 +1243,7 @@ function sarprasPopupStale(state, now) {
          <div class="f"><label for="kKab">Kabupaten/Kota</label><select id="kKab"><option value="">Semua kab/kota</option></select></div>
          <div class="f"><label for="kQ">Cari (desa, kecamatan, nama, kode)</label><input id="kQ" type="search"></div>
        </div>
+       <p class="sub" style="font-size:12px">Versi pemilih 2026-11-19.2 · Sampel TW II/III boleh dipilih kembali; alasan usulan dan persetujuan D302 tetap wajib.</p>
        <p class="sub" id="kSource" style="font-size:12px" role="status"></p>
        <div class="count" id="kCount">Memuat populasi KDKMP wilayah kerja…</div>
        <div class="tablewrap" style="max-height:36vh"><table id="kTbl"></table></div>
@@ -1253,7 +1260,7 @@ function sarprasPopupStale(state, now) {
     $("#kQ").addEventListener("input", renderKand);
     $("#kAlasan").addEventListener("input", validasiPick);
     $("#kTbl").addEventListener("click", (ev) => {
-      const tr = ev.target.closest("tr[data-k]"); if (!tr || tr.classList.contains("dis")) return;
+      const tr = ev.target.closest("tr[data-k]"); if (!tr || candidateBlockReason(code, tr.dataset.k)) return;
       PICK.sel = PICK.list.find((x) => x.kode === tr.dataset.k) || null;
       $("#kTbl").querySelectorAll("tr.on").forEach((r) => r.classList.remove("on")); tr.classList.add("on");
       $("#kSel").outerHTML = lokBox(PICK.sel, "KDKMP usulan", "sel").replace('class="box sel"', 'class="box sel" id="kSel"');
@@ -1266,14 +1273,13 @@ function sarprasPopupStale(state, now) {
   function renderKand() {
     if (!PICK || !PICK.list) return;
     const kat = $("#kKat").value, kab = $("#kKab").value, q = $("#kQ").value.trim().toLowerCase();
-    const ada = new Set((EFF.lists.get(PICK.code) || []).map((x) => x.kode)), kunci = kodeTerkunci(PICK.code);
     const rows = PICK.list.filter((x) => (!kat || x.kat.startsWith(kat)) && (!kab || x.kab === kab) &&
       (!q || [x.desa, x.kec, x.nama, x.kode, x.nik].some((v) => String(v || "").toLowerCase().includes(q))));
     const LIM = 300;
     $("#kCount").textContent = `${fmt(rows.length)} KDKMP sesuai filter dari ${fmt(PICK.list.length)} KDKMP kategori uji petik di wilayah kerja` + (rows.length > LIM ? ` · ditampilkan ${LIM} pertama, persempit dengan filter atau pencarian` : "");
     $("#kTbl").innerHTML = `<thead><tr><th></th><th>Kategori</th><th>Kab/Kota</th><th>Kecamatan</th><th>Desa/Kelurahan</th><th>Nama Koperasi</th><th>Keterangan</th></tr></thead><tbody>` +
       rows.slice(0, LIM).map((x) => {
-        const why = x.blok || (ada.has(x.kode) ? "Sudah ada di daftar lokasi" : kunci.has(x.kode) ? "Sedang dalam usulan lain" : "");
+        const why = candidateBlockReason(PICK.code, x.kode);
         const on = PICK.sel && PICK.sel.kode === x.kode;
         return `<tr data-k="${esc(x.kode)}" class="click ${why ? "dis" : ""} ${on ? "on" : ""}"><td>${why ? "" : '<span class="pick"></span>'}</td><td>${badge(x.kat)}</td><td>${esc(title(x.kab))}</td><td>${esc(x.kec)}</td><td>${esc(x.desa)}<div class="sub">${esc(x.kode)}</div></td><td style="min-width:200px">${esc(x.nama)}</td><td style="min-width:220px">${why ? `<b style="color:var(--mute)">${esc(why)}</b>` : esc(x.alasan)}</td></tr>`;
       }).join("") + `</tbody>`;

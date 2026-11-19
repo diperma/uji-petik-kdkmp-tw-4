@@ -50,7 +50,7 @@ test('picker completion with unknown sarpras retains rules-compatible historical
   assert.match(repeat.alasan, /sudah diuji petik BPKP \(TW II\/III\)/);
   assert.match(repeat.alasan, /persetujuan D302/);
   assert.doesNotMatch(html, /KDKMP sampel TW II\/TW III tidak diambil ulang/);
-  assert.match(html, /ada\.has\(x\.kode\).*kunci\.has\(x\.kode\)/);
+  assert.match(html, /const why = candidateBlockReason\(PICK.code, x.kode\)/);
   assert.equal(list.find(x => x.kode === 'operating').kat, '(4) Beroperasi — prioritas uji petik');
   assert.ok(list.every(x => /^\([1234]\)/.test(x.kat)));
   assert.ok(list.every(x => !/Perlu verifikasi|Gedung terbangun/.test(x.kat)));
