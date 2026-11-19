@@ -19,6 +19,7 @@ test('picker completion with unknown sarpras retains rules-compatible historical
     ]),
     beroperasi: dataset([
       row('operating', { 'Kategori uji petik TW IV': 'Prioritas' }),
+      row('palembang-repeat', { Provinsi: 'SUMATERA SELATAN', 'Kabupaten/Kota': 'KOTA PALEMBANG', 'Kategori uji petik TW IV': 'Sudah diuji petik BPKP (TW II/III)' }),
       row('stale-operation', { stale: true, 'Kategori uji petik TW IV': 'Prioritas' }),
     ]),
     belum_lahan: dataset([row('land'), row('stale-land', { stale: true })]),
@@ -32,7 +33,7 @@ test('picker completion with unknown sarpras retains rules-compatible historical
   vm.runInContext(html.slice(html.indexOf('  const KATS ='), html.indexOf('  const tierColor')), ctx);
   vm.runInContext(html.slice(html.indexOf('  async function loadKand('), html.indexOf('  let PICK =')), ctx);
   const list = await ctx.loadKand('P01');
-  assert.deepEqual(Array.from(list, x => x.kode).sort(), ['complete', 'land', 'mandek', 'operating', 'status']);
+  assert.deepEqual(Array.from(list, x => x.kode).sort(), ['complete', 'land', 'mandek', 'operating', 'palembang-repeat', 'status']);
   for (const code of ['complete', 'status']) {
     const candidate = list.find(x => x.kode === code);
     assert.equal(candidate.kat, '(1) Terbangun dengan kelengkapan');
@@ -42,6 +43,14 @@ test('picker completion with unknown sarpras retains rules-compatible historical
     assert.equal(vm.runInContext('katInfo(candidate.kat)[2]', ctx), 'Gedung terbangun');
     assert.match(vm.runInContext('badge(candidate.kat)', ctx), /badge bg1/);
   }
+  const repeat = list.find(x => x.kode === 'palembang-repeat');
+  assert.equal(repeat.kab, 'KOTA PALEMBANG');
+  assert.equal(repeat.kat, '(4) Beroperasi — potensial uji petik');
+  assert.equal(repeat.blok, undefined, 'Riwayat TW II/III tidak memblokir pemilihan ulang');
+  assert.match(repeat.alasan, /sudah diuji petik BPKP \(TW II\/III\)/);
+  assert.match(repeat.alasan, /persetujuan D302/);
+  assert.doesNotMatch(html, /KDKMP sampel TW II\/TW III tidak diambil ulang/);
+  assert.match(html, /ada\.has\(x\.kode\).*kunci\.has\(x\.kode\)/);
   assert.equal(list.find(x => x.kode === 'operating').kat, '(4) Beroperasi — prioritas uji petik');
   assert.ok(list.every(x => /^\([1234]\)/.test(x.kat)));
   assert.ok(list.every(x => !/Perlu verifikasi|Gedung terbangun/.test(x.kat)));
